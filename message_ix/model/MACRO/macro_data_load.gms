@@ -65,6 +65,10 @@ PARAMETERS
          esub(node)                  Elasticity between capital-labor (K-L) and energy (Sum E)
          rho(node)                   Production function exponent between capital-labor and energy nest (rho = (esub - 1) : esub)
          kpvs(node)                  Capital value share parameter
+         test_lukas(node)            Test Lukas 
+         EMIN(node)            Test Lukas 
+         wage(node)            Test Lukas 
+         alpha(node)            Test Lukas 
          ecst0(node)                 Energy costs in base year
          demand_base(node,sector)    base year consumption level of energy services from MESSAGE
 
@@ -131,7 +135,7 @@ $LABEL macro_data
 
 $LOAD type_node,cat_node
 $LOAD sector,mapping_macro_sector
-$LOAD kpvs,kgdp,esub,depr,drate,lotol
+$LOAD kpvs,kgdp,esub,depr,drate,lotol,test_lukas,EMIN,alpha,wage
 $LOAD lakl,prfconst
 $LOAD aeei,grow
 $LOAD gdp_calibrate,historical_gdp
