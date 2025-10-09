@@ -38,7 +38,6 @@ var = partial(_item_shorthand, MACRO, ItemType.VAR)
 #: ixmp items (sets, parameters, variables, and equations) for MACRO.
 _set("sector")
 _set("mapping_macro_sector", "sector c l")
-par("test_lukas", "node")
 par("EMIN", "node")
 par("alpha", "node")
 par("beta_rc_spec", "node")
