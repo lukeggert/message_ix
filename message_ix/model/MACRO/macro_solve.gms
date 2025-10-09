@@ -25,7 +25,7 @@ NEWENE.L(node_macro, sector, macro_horizon) = (
 );
 
 PHYSENE.L(node_macro, sector, year)  = enestart(node_macro, sector, year) ;
-KN.L(node_macro, macro_horizon)  = SVKN(node_macro, macro_horizon) $ (SVKN(node_macro, macro_horizon) > 0) + epsilon ;
+I.L(node_macro, macro_horizon)  = SVKN(node_macro, macro_horizon) $ (SVKN(node_macro, macro_horizon) > 0) + epsilon ;
 
 * ------------------------------------------------------------------------------
 * Lower bounds on variables help to avoid singularities
