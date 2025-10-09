@@ -61,7 +61,9 @@ INPUT_DATA = [
     "EMIN",
     "alpha",
     "wage",
-    "beta1",
+    "beta_rc_spec",
+    "beta_rc_therm",
+    "beta_transport",
 ]
 
 
