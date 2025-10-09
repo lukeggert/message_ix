@@ -19,10 +19,10 @@ EQUATIONS
     UTILITY_FUNCTION                      Utility function (discounted log of consumption summed over all projection periods)
     CAPITAL_CONSTRAINT(node, year_all)    Capital constraint
 
-    CAPITAL(node, year_all)           New capital
+    CAPITAL(node, year_all)               New capital
 
     INVESTMENT(node, year_all)            Total capital stock across all vintages
-    PRODUCTION(node, year_all)      Total production across all vintages
+    PRODUCTION(node, year_all)            Total production across all vintages
 
     NEW_ENERGY(node, sector, year_all)    New end-use services or commodities (production function)
     ENERGY_SUPPLY(node, sector, *)        Supply of end-use services or commodities
@@ -35,9 +35,15 @@ UTILITY_FUNCTION..
 UTILITY =E=
 SUM(node_active,
     1000 * (SUM(year $ (NOT macro_base_period(year) AND NOT last_period(year)),
-            udf(node_active, year) * ( (alpha(node_active) + beta1(node_active)) * LOG(C(node_active, year)) - beta1(node_active) * LOG(eneprice(node_active, 'light', year)) + beta1(node_active) * LOG(beta1(node_active)/alpha(node_active)) ) * duration_period(year) )
+            udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * LOG(C(node_active, year)) 
+            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year)) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
+            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year)) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
+            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year)) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * duration_period(year) )
         + SUM(year $ last_period(year),
-            udf(node_active, year) * ( (alpha(node_active) + beta1(node_active)) * LOG(C(node_active, year)) - beta1(node_active) * LOG(eneprice(node_active, 'light', year)) + beta1(node_active) * LOG(beta1(node_active)/alpha(node_active)) ) * (duration_period(year) ) + 1/finite_time_corr(node_active, year)) )
+            udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * LOG(C(node_active, year)) 
+            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year)) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
+            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year)) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
+            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year)) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * (duration_period(year) ) + 1/finite_time_corr(node_active, year)) )
 )
 ;
 
@@ -48,17 +54,29 @@ C(node_active, year) + I(node_active, year) + EC(node_active, year)
 
 CAPITAL(node_active, year) $ (NOT macro_base_period(year))..
 K(node_active, year) =E=
-SUM(year2$( seq_period(year2,year) ), K(node_active, year2) * (1 - depr(node_active))**duration_period(year) + I(node_active, year2))
+SUM(year2$( seq_period(year2,year) ), K(node_active, year2) * (1 - depr(node_active))**duration_period(year) + I(node_active, year))
 ;
 
 INVESTMENT(node_active, year) $ (NOT macro_base_period(year))..
-I(node_active, year) =E= K(node_active, year) * ((1 + interestrate(year))**duration_period(year) - 1) + duration_period(year) * labor(node_active, year) * wage(node_active) - duration_period(year) * eneprice(node_active, 'light', year) * labor(node_active, year) * EMIN(node_active) - duration_period(year) * (((alpha(node_active) + beta1(node_active))/alpha(node_active))) * C(node_active, year)
+I(node_active, year) =E= 
+SUM(year2$( seq_period(year2,year) ), K(node_active, year2) * ((1 + interestrate(year2))**duration_period(year) - 1) 
++ duration_period(year) * labor(node_active, year2) * wage(node_active) 
+- duration_period(year) * 0.7 * eneprice(node_active, 'rc_spec', year2) * labor(node_active, year2) * EMIN(node_active)
+- duration_period(year) * 0.7 * eneprice(node_active, 'rc_therm', year2) * labor(node_active, year2) * EMIN(node_active) 
+- duration_period(year) * 0.65 * eneprice(node_active, 'transport', year2) * labor(node_active, year2) * EMIN(node_active) 
+- duration_period(year) * (((alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active))/alpha(node_active))) * C(node_active, year2)
+)
 ;
 
 PRODUCTION(node_active, year) $ (NOT macro_base_period(year))..
 Y(node_active, year) =E=
 (LAKL(node_active) * K(node_active, year)**(rho(node_active) * kpvs(node_active)) * newlab(node_active, year)**(RHO(node_active) * (1 - kpvs(node_active)))
-+ PRFCONST(node_active, 'heat') * PRODENE(node_active, 'heat', year)**rho(node_active)) **(1/rho(node_active))
++ PRFCONST(node_active, 'i_spec') * PRODENE(node_active, 'i_spec', year)**rho(node_active)
++ PRFCONST(node_active, 'i_therm') * PRODENE(node_active, 'i_therm', year)**rho(node_active)
++ 0.3 * PRFCONST(node_active, 'rc_spec') * PRODENE(node_active, 'rc_spec', year)**rho(node_active)
++ 0.3 * PRFCONST(node_active, 'rc_therm') * PRODENE(node_active, 'rc_therm', year)**rho(node_active)
++ 0.35 * PRFCONST(node_active, 'transport') * PRODENE(node_active, 'transport', year)**rho(node_active)
+) **(1/rho(node_active))
 ;
 
 NEW_ENERGY(node_active, sector, year) $ (NOT macro_base_period(year))..
