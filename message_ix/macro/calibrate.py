@@ -58,6 +58,10 @@ INPUT_DATA = [
     "lotol",
     "MERtoPPP",
     "price_ref",
+    "EMIN",
+    "alpha",
+    "wage",
+    "beta1",
 ]
 
 
