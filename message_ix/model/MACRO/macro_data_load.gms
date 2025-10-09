@@ -71,6 +71,11 @@ PARAMETERS
          lakl(node)                  Production function coefficient of capital and labor
          prfconst(node, sector)      Production function coefficient of different energy sectors
 
+         EMIN(node)                  Test Lukas 
+         wage(node)                  Test Lukas 
+         beta1(node)                 Test Lukas
+         alpha(node)                 Test Lukas 
+
          enestart(node,sector,year_all)  Consumption level of energy services from MESSAGE model run
          eneprice(node,sector,year_all)  Shadow prices of energy services from MESSAGE model run
          total_cost(node,year_all)       Total energy system costs from MESSAGE model run
@@ -131,7 +136,7 @@ $LABEL macro_data
 
 $LOAD type_node,cat_node
 $LOAD sector,mapping_macro_sector
-$LOAD kpvs,kgdp,esub,depr,drate,lotol
+$LOAD kpvs,kgdp,esub,depr,drate,lotol,alpha,wage,EMIN,beta1
 $LOAD lakl,prfconst
 $LOAD aeei,grow
 $LOAD gdp_calibrate,historical_gdp
