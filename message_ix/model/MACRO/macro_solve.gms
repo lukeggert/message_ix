@@ -32,9 +32,7 @@ KN.L(node_macro, macro_horizon)  = SVKN(node_macro, macro_horizon) $ (SVKN(node_
 * ------------------------------------------------------------------------------
 
 K.LO(node_macro, macro_horizon)  = LOTOL(node_macro) * k0(node_macro) ;
-KN.LO(node_macro, macro_horizon) = LOTOL(node_macro) * i0(node_macro) * duration_period(macro_horizon) ;
 Y.LO(node_macro, macro_horizon)  = LOTOL(node_macro) * y0(node_macro) ;
-YN.LO(node_macro, macro_horizon) = LOTOL(node_macro) * y0(node_macro) * newlab(node_macro, macro_horizon) ;
 
 C.LO(node_macro, macro_horizon)  = LOTOL(node_macro) * c0(node_macro) ;
 I.LO(node_macro, macro_horizon)  = LOTOL(node_macro) * i0(node_macro) ;
