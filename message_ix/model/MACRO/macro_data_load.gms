@@ -73,7 +73,9 @@ PARAMETERS
 
          EMIN(node)                  Test Lukas 
          wage(node)                  Test Lukas 
-         beta1(node)                 Test Lukas
+         beta_rc_spec(node)          Test Lukas
+         beta_rc_therm(node)         Test Lukas
+         beta_transport(node)        Test Lukas
          alpha(node)                 Test Lukas 
 
          enestart(node,sector,year_all)  Consumption level of energy services from MESSAGE model run
@@ -136,7 +138,7 @@ $LABEL macro_data
 
 $LOAD type_node,cat_node
 $LOAD sector,mapping_macro_sector
-$LOAD kpvs,kgdp,esub,depr,drate,lotol,alpha,wage,EMIN,beta1
+$LOAD kpvs,kgdp,esub,depr,drate,lotol,alpha,wage,EMIN,beta_rc_spec,beta_rc_therm,beta_transport
 $LOAD lakl,prfconst
 $LOAD aeei,grow
 $LOAD gdp_calibrate,historical_gdp
