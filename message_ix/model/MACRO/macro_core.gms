@@ -15,6 +15,11 @@ VARIABLES
     EC(node, year_all)               System costs (Trillion $) based on MESSAGE model run
 ;
 
+Variables
+* auxiliary variables for demand, prices, costs and GDP (for reporting when MESSAGE is run with MACRO)
+    GDP(node,year_all)               gross domestic product (GDP) in market exchange rates for MACRO reporting
+;
+
 EQUATIONS
     UTILITY_FUNCTION                      Utility function (discounted log of consumption summed over all projection periods)
     CAPITAL_CONSTRAINT(node, year_all)    Capital constraint
