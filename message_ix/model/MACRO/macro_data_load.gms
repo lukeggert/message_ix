@@ -75,6 +75,15 @@ PARAMETERS
          eneprice(node,sector,year_all)  Shadow prices of energy services from MESSAGE model run
          total_cost(node,year_all)       Total energy system costs from MESSAGE model run
 
+         EMIN(node)                  Test Lukas
+         pei(node, year_all)
+         k_final(node)
+         h(node,sector)              Test Lukas
+         beta_rc_spec(node)          Test Lukas
+         beta_rc_therm(node)         Test Lukas
+         beta_transport(node)        Test Lukas
+         alpha(node)                 Test Lukas
+
 * the following three parameters are used for running MACRO standalone and for calibration purposes
          demand_MESSAGE(node,sector,year_all) consumption level of energy services from MESSAGE model run
          price_MESSAGE(node,sector,year_all)  shadow prices of energy services from MESSAGE model run
@@ -82,9 +91,7 @@ PARAMETERS
 
          udf(node, year_all)             Utility discount factor in period year
          labor(node, year_all)           Labor force (efficiency units) in period year
-         newlab(node, year_all)          New vintage of labor force in period year
 
-         grow(node, year_all)            Annual growth rates of potential GDP
          aeei(node, sector, year_all)    Annual potential decrease of energy intensity in sector sector
          aeei_factor(node, sector, year_all) Cumulative effect of autonomous energy efficiency improvement (AEEI)
 
@@ -131,12 +138,25 @@ $LABEL macro_data
 
 $LOAD type_node,cat_node
 $LOAD sector,mapping_macro_sector
-$LOAD kpvs,kgdp,esub,depr,drate,lotol
+$LOAD kpvs,kgdp,esub,depr,drate,lotol,alpha,EMIN,beta_rc_spec,beta_rc_therm,beta_transport,k_final
+$LOAD h
 $LOAD lakl,prfconst
-$LOAD aeei,grow
+$LOAD aeei
 $LOAD gdp_calibrate,historical_gdp
 $LOAD demand_MESSAGE,price_MESSAGE,cost_MESSAGE
+
+* Note: pei is maybe loaded separately from pei_data.gdx file below
+$LOAD pei
 $GDXIN
+
+*----------------------------------------------------------------------------------------------------------------------*
+* Load pei parameter from separate GDX file                                                                          *
+*----------------------------------------------------------------------------------------------------------------------*
+
+* Load pei values from separate wage-specific GDX file
+*$GDXIN '/home/lukas/environments/ssp2/lib/python3.10/site-packages/message_ix/model/output/MsgOutput_MESSAGEix_ssp2_baseline_1102_new_macro_macro.gdx'
+*$LOAD pei
+*$GDXIN
 
 node_macro(node)$( cat_node('economy',node) ) = yes ;
 
@@ -192,7 +212,7 @@ PARAMETER growth_factor(node, year_all)  'cumulative growth factor' ;
 growth_factor(node_macro, macro_base_period) = 1;
 
 LOOP(year $ (NOT macro_base_period(year)),
-    growth_factor(node_macro, year) = SUM(year2$( seq_period(year2,year) ), growth_factor(node_macro, year2) * (1 + grow(node_macro, year))**(duration_period(year))) ;
+    growth_factor(node_macro, year) = SUM(year2$( seq_period(year2,year) ), growth_factor(node_macro, year2) * (1 + pei(node_macro, year))**(duration_period(year))) ;
 ) ;
 
 PARAMETER potential_gdp(node, year_all) ;
@@ -227,14 +247,12 @@ labor(node_macro, macro_initial_period) = 1 ;
 
 LOOP(year_all $( ORD(year_all) > sum(year_all2$( macro_initial_period(year_all2) ), ORD(year_all2) ) ),
 * exogenous labor supply growth (including both changes in labor force and labor productivity growth)
-   labor(node_macro, year_all)  = SUM(year_all2$( seq_period(year_all2,year_all) ), labor(node_macro, year_all2) * (1 + grow(node_macro, year_all))**duration_period(year_all)) ;
-* new labor supply
-   newlab(node_macro, year_all) = SUM(year_all2$( seq_period(year_all2,year_all) ), (labor(node_macro, year_all) - labor(node_macro, year_all2)*(1 - depr(node_macro))**duration_period(year_all))$((labor(node_macro, year_all) - labor(node_macro, year_all2)*(1 - depr(node_macro))**duration_period(year_all)) > 0)) + epsilon ;
+   labor(node_macro, year_all)  = labor(node_macro, year_all2) ;
 * calculation of utility discount factor based on discount rate (drate)
-   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - (drate(node_macro) - grow(node_macro, year_all)))**duration_period(year_all)) ;
+   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - drate(node_macro))**duration_period(year_all)) ;
 );
 
-DISPLAY labor, newlab, udf;
+DISPLAY labor, udf;
 
 * ------------------------------------------------------------------------------
 * Calculation of base year energy system costs, capital stock and GDP components (investment, consumption, production)
@@ -249,7 +267,7 @@ k0(node_macro) = kgdp(node_macro) * gdp_base(node_macro) ;
 * pseudo loop over base_period set which includes single element
 LOOP(macro_base_period,
 * VK, 08 April 2008: avoid negative starting values as this causes error in program execution
-     i0(node_macro) = (k0(node_macro) * (grow(node_macro, macro_base_period) + depr(node_macro)))$(k0(node_macro) * (grow(node_macro, macro_base_period) + depr(node_macro)) > 0) + epsilon ;
+     i0(node_macro) = (k0(node_macro) * (pei(node_macro, macro_base_period) + depr(node_macro)))$(k0(node_macro) * (pei(node_macro, macro_base_period) + depr(node_macro)) > 0) + epsilon ;
 );
 c0(node_macro) = gdp_base(node_macro) - i0(node_macro) - ecst0(node_macro)/1000 ;
 y0(node_macro) = gdp_base(node_macro) ;
@@ -263,4 +281,4 @@ DISPLAY ecst0, k0, i0, c0, y0 ;
 * simply taken.
 * ------------------------------------------------------------------------------
 
-finite_time_corr(node_macro, year) = abs(drate(node_macro) - grow(node_macro, year)) ;
+finite_time_corr(node_macro, year) = abs(drate(node_macro) - pei(node_macro, year)) ;
