@@ -58,6 +58,14 @@ INPUT_DATA = [
     "lotol",
     "MERtoPPP",
     "price_ref",
+    "EMIN",
+    "alpha",
+    "h",
+    "beta_rc_spec",
+    "beta_rc_therm",
+    "beta_transport",
+    "pei",
+    "k_final",
 ]
 
 
