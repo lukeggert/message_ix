@@ -121,20 +121,20 @@ Variables
 
 EQUATIONS
     UTILITY_FUNCTION                      Utility function (discounted log of consumption summed over all projection periods)
+
     CAPITAL_CONSTRAINT(node, year_all)    Capital constraint
+    CAPITAL(node, year_all)               Capital accumulation
+    INVESTMENT(node, year_all)            Investment accounting
 
-    NEW_CAPITAL(node, year_all)           New capital
-    NEW_PRODUCTION(node, year_all)        New production
+    PRODUCTION(node, year_all)            Production
 
-    TOTAL_CAPITAL(node, year_all)         Total capital stock across all vintages
-    TOTAL_PRODUCTION(node, year_all)      Total production across all vintages
+    ENERGY_ACCOUNTING(node, sector, year_all)  Energy accounting
+    ENERGY_ACCOUNTING2(node, sector, year_all) Energy accounting (household share)
+    ENERGY_SUPPLY(node, sector, *)             Supply of end-use services or commodities
 
-    NEW_ENERGY(node, sector, year_all)    New end-use services or commodities (production function)
-    ENERGY_SUPPLY(node, sector, *)        Supply of end-use services or commodities
-
-    COST_ENERGY(node, year_all)           system costs approximation based on MESSAGE input
+    COST_ENERGY(node, year_all)           System costs approximation based on MESSAGE input
     TERMINAL_CONDITION(node, year_all)    Terminal condition
-    
+
     MARGINAL_PRODUCT_CAPITAL(node, year_all)  Marginal product of capital equals interest rate plus depreciation
     MARGINAL_PRODUCT_LABOR(node, year_all)    Marginal product of labor equals wage rate
     CAPITAL_GROWTH(node, year_all)            Capital growth rate definition
@@ -302,9 +302,9 @@ KGROW(node_active, year) =E=
 ;
 
 ***
-* Equations NEW ENERGY ACCOUNTING
+* Equations ENERGY ACCOUNTING
 * ---------------------------------
-*New energy accounting equations. Need to be discussed and checked. See model documentation.
+* Energy accounting equations. See model documentation.
 *
 ***
 
@@ -371,11 +371,11 @@ I(node_active, last_period) =G= K(node_active, last_period) * (KGROW(node_active
 MODEL MESSAGE_MACRO /
     UTILITY_FUNCTION
     CAPITAL_CONSTRAINT
-    NEW_CAPITAL
-    NEW_PRODUCTION
-    TOTAL_CAPITAL
-    TOTAL_PRODUCTION
-    NEW_ENERGY
+    CAPITAL
+    INVESTMENT
+    PRODUCTION
+    ENERGY_ACCOUNTING
+    ENERGY_ACCOUNTING2
     ENERGY_SUPPLY
     COST_ENERGY
     TERMINAL_CONDITION
