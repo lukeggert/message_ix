@@ -20,34 +20,41 @@ SVNEWE(node_macro, sector, year) = (
   )
 )$(NOT macro_base_period(year));
 
-NEWENE.L(node_macro, sector, macro_horizon) = (
+TE.L(node_macro, sector, macro_horizon) = (
+  SVNEWE(node_macro, sector, macro_horizon)$(SVNEWE(node_macro, sector, macro_horizon) > 0) + epsilon
+);
+YE.L(node_macro, sector, macro_horizon) = (1-h(node_macro, sector)) * (
+  SVNEWE(node_macro, sector, macro_horizon)$(SVNEWE(node_macro, sector, macro_horizon) > 0) + epsilon
+);
+E.L(node_macro, sector, macro_horizon) = h(node_macro, sector) * (
   SVNEWE(node_macro, sector, macro_horizon)$(SVNEWE(node_macro, sector, macro_horizon) > 0) + epsilon
 );
 
 PHYSENE.L(node_macro, sector, year)  = enestart(node_macro, sector, year) ;
-KN.L(node_macro, macro_horizon)  = SVKN(node_macro, macro_horizon) $ (SVKN(node_macro, macro_horizon) > 0) + epsilon ;
+K.L(node_macro, macro_horizon)  = SVKN(node_macro, macro_horizon) $ (SVKN(node_macro, macro_horizon) > 0) + epsilon ;
 
 * ------------------------------------------------------------------------------
 * Lower bounds on variables help to avoid singularities
 * ------------------------------------------------------------------------------
 
 K.LO(node_macro, macro_horizon)  = LOTOL(node_macro) * k0(node_macro) ;
-KN.LO(node_macro, macro_horizon) = LOTOL(node_macro) * i0(node_macro) * duration_period(macro_horizon) ;
 Y.LO(node_macro, macro_horizon)  = LOTOL(node_macro) * y0(node_macro) ;
-YN.LO(node_macro, macro_horizon) = LOTOL(node_macro) * y0(node_macro) * newlab(node_macro, macro_horizon) ;
 
 C.LO(node_macro, macro_horizon)  = LOTOL(node_macro) * c0(node_macro) ;
 I.LO(node_macro, macro_horizon)  = LOTOL(node_macro) * i0(node_macro) ;
 
-PRODENE.LO(node_macro, sector, macro_horizon) = LOTOL(node_macro) * enestart(node_macro, sector, macro_horizon) / aeei_factor(node_macro, sector, macro_horizon) ;
-NEWENE.LO(node_macro, sector, macro_horizon)  = LOTOL(node_macro) * enestart(node_macro, sector, macro_horizon) / aeei_factor(node_macro, sector, macro_horizon) ;
+TE.LO(node_macro, sector, macro_horizon) = LOTOL(node_macro) * enestart(node_macro, sector, macro_horizon) / aeei_factor(node_macro, sector, macro_horizon) ;
+YE.LO(node_macro, sector, macro_horizon) = (1-h(node_macro, sector)) * LOTOL(node_macro) * enestart(node_macro, sector, macro_horizon) / aeei_factor(node_macro, sector, macro_horizon) ;
+E.LO(node_macro, sector, macro_horizon) = h(node_macro, sector) * LOTOL(node_macro) * enestart(node_macro, sector, macro_horizon) / aeei_factor(node_macro, sector, macro_horizon) ;
 
 * ------------------------------------------------------------------------------
 * Base year values of variables are fixed to historical values
 * ------------------------------------------------------------------------------
 
 * division by aeei_factor is necesary in case MACRO starts after initialize_period (in case of slicing)
-PRODENE.FX(node_macro, sector, macro_base_period) = demand_base(node_macro, sector) / aeei_factor(node_macro, sector, macro_base_period) ;
+TE.FX(node_macro, sector, macro_base_period) = demand_base(node_macro, sector) / aeei_factor(node_macro, sector, macro_base_period) ;
+YE.FX(node_macro, sector, macro_base_period) = (1-h(node_macro, sector)) * demand_base(node_macro, sector) / aeei_factor(node_macro, sector, macro_base_period) ;
+E.FX(node_macro, sector, macro_base_period) = h(node_macro, sector) * demand_base(node_macro, sector) / aeei_factor(node_macro, sector, macro_base_period) ;
 
 Y.FX(node_macro, macro_base_period) = y0(node_macro) ;
 K.FX(node_macro, macro_base_period) = k0(node_macro) ;
