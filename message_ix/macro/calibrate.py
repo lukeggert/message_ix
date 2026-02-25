@@ -96,6 +96,22 @@ def aconst(
     return aconst.droplevel("year")
 
 
+def _weight_scale(lakl: "Series", prfconst: "Series") -> "Series":
+    """Scale so lakl + sum(prfconst) = 1 per node, preserving relative weights."""
+    prf_sum = prfconst.groupby(level="node").sum()
+    return 1.0 / (lakl + prf_sum)
+
+
+def _scale_lakl(lakl: "Series", scale: "Series") -> "Series":
+    """Apply per-node scale to lakl."""
+    return lakl * scale
+
+
+def _scale_prfconst(prfconst: "Series", scale: "Series") -> "Series":
+    """Apply per-node scale to prfconst."""
+    return prfconst.mul(scale, level="node")
+
+
 def add_par(
     scenario: "Scenario", data: "pandas.DataFrame", ym1: int, *, name: str
 ) -> None:
@@ -767,10 +783,20 @@ def prepare_computer(
         "ym1",
     )
     c.add("demand_MESSAGE", demand, cleaned["DEMAND"], "demand_ref", mms, "ym1")
-    c.add("prfconst", bconst, "demand_ref", "historical_gdp", "price_ref", "rho")
+    c.add("prfconst_raw", bconst, "demand_ref", "historical_gdp", "price_ref", "rho")
     c.add(
-        "lakl", aconst, "prfconst", "demand_ref", "historical_gdp", "k0", "kpvs", "rho"
+        "lakl_raw",
+        aconst,
+        "prfconst_raw",
+        "demand_ref",
+        "historical_gdp",
+        "k0",
+        "kpvs",
+        "rho",
     )
+    c.add("weight_scale", _weight_scale, "lakl_raw", "prfconst_raw")
+    c.add("prfconst", _scale_prfconst, "prfconst_raw", "weight_scale")
+    c.add("lakl", _scale_lakl, "lakl_raw", "weight_scale")
 
     # Add the data to the scenario for each MACRO parameter. Some of these are directly
     # from the input (also appearing in VERIFY_INPUT_DATA); others are from calculations
