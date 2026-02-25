@@ -47,7 +47,7 @@ If (mod(ctr, 2) eq 0,
     gdp_scale(node_macro,year) = gdp_mer_macro(node_macro,year)/gdp_calibrate(node_macro,year) ;
     growth_correction(node_macro,year) $ (NOT macro_base_period(year)) = SUM(year2 $ seq_period(year2,year), ((gdp_calibrate(node_macro,year)/gdp_calibrate(node_macro,year2))**(1/duration_period(year)))
                                                                                                            - ((gdp_mer_macro(node_macro,year)/gdp_mer_macro(node_macro,year2))**(1/duration_period(year))) ) ;
-    grow(node_macro,year) = grow(node_macro,year) + growth_correction(node_macro,year) ;
+    pei(node_macro,year) = pei(node_macro,year) + growth_correction(node_macro,year) ;
 Elseif mod(ctr, 2) eq 1,
 * calculate correction factor for aeei and apply for next iteration of MACRO
     aeei_correction(node_macro,sector,year) $ (NOT macro_base_period(year)) = SUM(year2 $ seq_period(year2,year), ((demand_new(node_macro,sector,year)/demand_MESSAGE(node_macro,sector,year)) / (demand_new(node_macro,sector,year2)/demand_MESSAGE(node_macro,sector,year2)))**(1/duration_period(year)) - 1) ;
@@ -64,7 +64,7 @@ DISPLAY growth_correction, gdp_mer_macro, gdp_scale ;
 growth_factor(node_macro, macro_base_period) = 1;
 
 LOOP(year $ (NOT macro_base_period(year)),
-    growth_factor(node_macro, year) = SUM(year2$( seq_period(year2,year) ), growth_factor(node_macro, year2) * (1 + grow(node_macro, year))**(duration_period(year))) ;
+    growth_factor(node_macro, year) = SUM(year2$( seq_period(year2,year) ), growth_factor(node_macro, year2) * (1 + pei(node_macro, year))**(duration_period(year))) ;
 ) ;
 
 potential_gdp(node_macro, year) = sum(macro_base_period, historical_gdp(node_macro, macro_base_period)/1000) * growth_factor(node_macro, year) ;
@@ -82,21 +82,19 @@ labor(node_macro, macro_base_period) = 1 ;
 
 LOOP(year_all $( ORD(year_all) > sum(year_all2$( macro_initial_period(year_all2) ), ORD(year_all2) ) ),
 * exogenous labor supply growth (including both changes in labor force and labor productivity growth)
-   labor(node_macro, year_all)  = SUM(year_all2$( seq_period(year_all2,year_all) ), labor(node_macro, year_all2) * (1 + grow(node_macro, year_all))**duration_period(year_all)) ;
-* new labor supply
-   newlab(node_macro, year_all) = SUM(year_all2$( seq_period(year_all2,year_all) ), (labor(node_macro, year_all) - labor(node_macro, year_all2)*(1 - depr(node_macro))**duration_period(year_all))$((labor(node_macro, year_all) - labor(node_macro, year_all2)*(1 - depr(node_macro))**duration_period(year_all)) > 0)) + epsilon ;
+   labor(node_macro, year_all)  = labor(node_macro, year_all2) ;
 * calculation of utility discount factor based on discount rate (drate)
-   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - (drate(node_macro) - grow(node_macro, year_all)))**duration_period(year_all)) ;
+   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - drate(node_macro))**duration_period(year_all)) ;
 );
 
 * recalcualte finite time horizon correction of utility function
-finite_time_corr(node_macro, year) = abs(drate(node_macro) - grow(node_macro, year)) ;
+finite_time_corr(node_macro, year) = abs(drate(node_macro) - pei(node_macro, year)) ;
 
 ) ;
 
 * export calibration results as reporting variables to GDX
 aeei_calibrate.L(node_macro,sector,year) = aeei(node_macro,sector,year) ;
-grow_calibrate.L(node_macro,year) = grow(node_macro,year) ;
+grow_calibrate.L(node_macro,year) = pei(node_macro,year) ;
 
 * subtract one due to 1-based indexing
 N_ITER.L = ctr - 1;

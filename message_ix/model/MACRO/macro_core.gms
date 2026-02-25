@@ -205,7 +205,7 @@ C(node_active, year) + I(node_active, year) + EC(node_active, year)
 CAPITAL(node_active, year) $ (NOT macro_base_period(year))..
 K(node_active, year) =E=
 SUM(year2$( seq_period(year2,year) ), K(node_active, year2) * (1 - depr(node_active))**duration_period(year2) + K(node_active, year2) * ((1 + interestrate(year2))**duration_period(year2) - 1) 
-+ duration_period(year2) * labor(node_active, year2) * wage(node_active, year2) 
++ duration_period(year2) * labor(node_active, year2) * WAGE(node_active, year2) 
 - duration_period(year2) * eneprice(node_active, 'rc_spec', year2)/1000 * labor(node_active, year2) * EMIN(node_active)
 - duration_period(year2) * eneprice(node_active, 'rc_therm', year2)/1000 * labor(node_active, year2) * EMIN(node_active) 
 - duration_period(year2) * eneprice(node_active, 'transport', year2)/1000 * labor(node_active, year2) * EMIN(node_active) 
