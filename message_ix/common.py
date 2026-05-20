@@ -5,8 +5,9 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from copy import copy
 from dataclasses import InitVar, dataclass, field
+from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import ixmp.model.gams
 from ixmp import config
@@ -15,6 +16,7 @@ from ixmp.backend import ItemType
 if TYPE_CHECKING:
     from logging import LogRecord
 
+    from genno import Key
     from ixmp.types import InitializeItemsKwargs
 
 
@@ -68,9 +70,11 @@ DIMS = {
     "yr": ("year", "year_rel"),
     "yv": ("year", "year_vtg"),
 }
+# Inverse mapping
+DIMS_INVERSE = {v[1]: k for k, v in DIMS.items()}
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Item:
     """Description of an :mod:`ixmp` item: equation, parameter, set, or variable.
 
@@ -96,7 +100,7 @@ class Item:
     dims: tuple[str, ...] = field(default_factory=tuple)
 
     #: Text description of the item.
-    description: Optional[str] = None
+    description: str | None = None
 
     def __post_init__(self, expr):
         if expr == "":
@@ -117,6 +121,18 @@ class Item:
         Read-only.
         """
         return str(self.type.name).lower()
+
+    @property
+    @cache
+    def key(self) -> "Key":
+        """:class:`genno.Key` for this Item in a :class:`.Reporter`.
+
+        Read-only.
+        """
+        from genno import Key
+
+        dims = [DIMS_INVERSE.get(d, d) for d in self.dims or self.coords]
+        return Key(self.name, dims)
 
     def to_dict(self) -> "InitializeItemsKwargs":
         """Return the :class:`dict` representation used internally in :mod:`ixmp`."""
@@ -169,12 +185,12 @@ class GAMSModel(ixmp.model.gams.GAMSModel):
     model_dir: Path
 
     #: Optional minimum version of GAMS.
-    GAMS_min_version: Optional[str] = None
+    GAMS_min_version: str | None = None
 
     #: Keyword arguments to map to GAMS `solve_args`.
     keyword_to_solve_arg: list[tuple[str, type, str]]
 
-    def __init__(self, name: Optional[str] = None, **model_options) -> None:
+    def __init__(self, name: str | None = None, **model_options) -> None:
         if gmv := self.GAMS_min_version:
             # Check the minimum GAMS version.
             version = ixmp.model.gams.gams_version() or ""

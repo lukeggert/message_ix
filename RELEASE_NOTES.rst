@@ -22,7 +22,11 @@ Adjust any imports like the following:
 All changes
 -----------
 
-- Add representation of commodity flows associated with construction and retirement of technology capacity (:pull:`451`).
+- :mod:`message_ix` is tested and compatible with `Python 3.14 <https://www.python.org/downloads/release/python-3140/>`__ (:pull:`985`).
+- Support for Python 3.9 is dropped (:pull:`985`), as it has reached end-of-life.
+- :mod:`message_ix` is tested and compatible with `Pandas 3.0.0 <https://pandas.pydata.org/pandas-docs/stable/whatsnew/v3.0.0.html>`_,
+  released 2026-01-21 (:pull:`1001`).
+- Add representation of commodity flows associated with construction and retirement of technology capacity (:pull:`451`, :pull:`1003`).
 
   - New parameters
     |input_cap|,
@@ -45,9 +49,17 @@ All changes
   - :mod:`message_ix.message` includes :class:`.MESSAGE`.
   - :mod:`message_ix.message_macro` includes :class:`.MESSAGE_MACRO`.
 
+- Improve :class:`.Reporter` and its documentation (:pull:`991`).
+
+  - Handle older scenarios—for instance, those without |input_cap|—in :meth:`.Reporter.from_scenario` (:issue:`988`).
+  - Expand and test keys for multiple methods of calculating :ref:`reporter-historical` (:issue:`989`).
+
 - Document the :ref:`minimum version of Java <install-java>` required for :class:`ixmp.JDBCBackend <ixmp.backend.jdbc.JDBCBackend>` (:pull:`962`).
+- Document :ref:`how to run a local PostgreSQL instance <install-postgres>`
+  for local testing using :class:`ixmp.IXMP4Backend <ixmp.backend.ixmp4.IXMP4Backend>` (:pull:`981`).
 - Improve type hinting (:pull:`963`).
 - Fix capitalization in auxiliary_settings.gms to enable GDX output file compression on MacOS and Linux. (:pull:`965`) 
+
 All changes
 -----------
 

@@ -1,9 +1,11 @@
 import io
+import logging
 import os
-from collections.abc import Callable, Generator
-from itertools import product
+import platform
+from collections.abc import Callable, Iterator
+from itertools import count, product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 import ixmp
 import numpy as np
@@ -17,12 +19,33 @@ from message_ix.report import Reporter
 
 if TYPE_CHECKING:
     from ixmp import Platform
+    from ixmp import Reporter as IXMPReporter
     from pint import UnitRegistry
 
+log = logging.getLogger(__name__)
 
 GHA = "GITHUB_ACTIONS" in os.environ
 
 # Pytest hooks
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Force iam-units to use a distinct cache for each worker.
+
+    Work arounds for:
+
+    1. https://github.com/hgrecco/flexcache/issues/6 /
+       https://github.com/IAMconsortium/units/issues/54.
+    2. https://github.com/python/cpython/issues/125235,
+       https://github.com/astral-sh/uv/issues/7036, or similar.
+    """
+    name = f"iam-units-{os.environ.get('PYTEST_XDIST_WORKER', '')}".rstrip("-")
+    os.environ["IAM_UNITS_CACHE"] = str(config.cache.mkdir(name))
+
+    if GHA and platform.system() == "Windows":
+        import matplotlib
+
+        matplotlib.use("agg")
 
 
 def pytest_report_header(config: pytest.Config, start_path: Path) -> str:
@@ -80,7 +103,7 @@ SNAPSHOTS = (
 
 # Create and populate ixmp databases
 
-_ms: list[Union[str, float]] = [
+_ms: list[str | float] = [
     SCENARIO["dantzig"]["model"],
     SCENARIO["dantzig"]["scenario"],
 ]
@@ -149,13 +172,33 @@ cfl                  0.0  0.1   10   900
 )
 
 
+def assert_keys(rep: "IXMPReporter", expected: set[str], dump_dir: "Path") -> None:
+    """Assert that the keys in `rep` match `expected`.
+
+    If there is not an exact match, the keys in `rep` are dumped to a text file and
+    :class:`AssertionError` is raised including the path to the file.
+    """
+    obs = set(map(str, rep.graph))
+    try:
+        assert expected == obs
+    except AssertionError:
+        # Find a path for a dump that does not yet exist
+        for path in map(lambda i: dump_dir / f"dump-{i}.txt", count()):
+            if not path.exists():
+                break
+
+        path.write_text("\n".join(sorted(obs)))
+
+        assert len(expected) == len(obs) and False, f"Wrote observed keys to {path}"
+
+
 # FIXME reduce complexity 19 → ≤13
 def make_austria(  # noqa: C901
     mp,
     solve: bool = False,
     quiet: bool = True,
     *,
-    request: Optional["pytest.FixtureRequest"] = None,
+    request: "pytest.FixtureRequest | None" = None,
 ) -> Scenario:
     """Return an :class:`message_ix.Scenario` for the Austrian energy system.
 
@@ -342,7 +385,7 @@ def make_dantzig(
     solve: bool = False,
     multi_year: bool = False,
     *,
-    request: Optional["pytest.FixtureRequest"] = None,
+    request: "pytest.FixtureRequest | None" = None,
     **solve_opts,
 ) -> Scenario:
     """Return an :class:`message_ix.Scenario` for Dantzig's canning problem.
@@ -511,7 +554,7 @@ def make_westeros(
     quiet: bool = True,
     model_horizon: list[int] = [700, 710, 720],
     *,
-    request: Optional["pytest.FixtureRequest"] = None,
+    request: "pytest.FixtureRequest | None" = None,
 ) -> Scenario:
     """Return a new :class:`message_ix.Scenario` containing the ‘Westeros’ model.
 
@@ -705,7 +748,7 @@ def make_subannual(
     var_cost={},
     operation_factor={},
     *,
-    request: Optional["pytest.FixtureRequest"] = None,
+    request: "pytest.FixtureRequest | None" = None,
 ) -> Scenario:
     """Return an :class:`message_ix.Scenario` with subannual time resolution.
 
@@ -859,7 +902,7 @@ def make_subannual(
 @pytest.fixture
 def dantzig_reporter(
     request: pytest.FixtureRequest, message_test_mp: "Platform", ureg: "UnitRegistry"
-) -> Generator[Reporter, Any, None]:
+) -> Iterator[Reporter]:
     """A :class:`.Reporter` with a solved :func:`.make_dantzig` scenario."""
     scen = Scenario(message_test_mp, **SCENARIO["dantzig"]).clone(
         scenario=request.node.name
@@ -879,9 +922,7 @@ def dantzig_reporter(
 
 
 @pytest.fixture(scope="session")
-def message_ix_cli(
-    tmp_env: os._Environ[str],
-) -> Generator[Callable[..., Result], Any, None]:
+def message_ix_cli(tmp_env: os._Environ[str]) -> Iterator[Callable[..., Result]]:
     """A CliRunner object that invokes the message_ix command-line interface.
 
     :obj:`None` in *args* is automatically discarded.
@@ -902,7 +943,7 @@ def message_ix_cli(
 
 
 @pytest.fixture(scope="class")
-def message_test_mp(test_mp: "Platform") -> Generator["Platform", Any, None]:
+def message_test_mp(test_mp: "Platform") -> Iterator["Platform"]:
     """A test platform with two versions of the :func:`.make_dantzig` scenario.
 
     One version has :py:`multi_year=False`, and the other :py:`multi_year=True`.
@@ -974,7 +1015,7 @@ def test_data_path(request: pytest.FixtureRequest) -> Path:
 
 
 @pytest.fixture(scope="function")
-def tmp_model_dir(tmp_path: Path) -> Generator[Path, Any, None]:
+def tmp_model_dir(tmp_path: Path) -> Iterator[Path]:
     """Temporary directory containing a copy of the MESSAGE model files.
 
     This may be used, among other purposes, to isolate the writing/reading of
@@ -991,6 +1032,14 @@ def tmp_model_dir(tmp_path: Path) -> Generator[Path, Any, None]:
     yield tmp_path
 
 
+@pytest.fixture
+def tmp_scenario(
+    request: pytest.FixtureRequest, test_mp: "Platform"
+) -> Iterator[Scenario]:
+    """A temporary scenario, unique to a particular test."""
+    yield Scenario(test_mp, model=request.node.name, scenario="TEST", version="new")
+
+
 @pytest.fixture(scope="session")
 def tutorial_path(request: pytest.FixtureRequest) -> Path:
     """Path to the directory containing the tutorials."""
@@ -998,7 +1047,7 @@ def tutorial_path(request: pytest.FixtureRequest) -> Path:
 
 
 @pytest.fixture(scope="session")
-def ureg() -> Generator["UnitRegistry", Any, None]:
+def ureg() -> Iterator["UnitRegistry"]:
     """Session-scoped :class:`pint.UnitRegistry` with units needed by tests."""
     import pint
 

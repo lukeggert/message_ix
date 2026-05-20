@@ -20,16 +20,16 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: R",
   "Topic :: Scientific/Engineering",
   "Topic :: Scientific/Engineering :: Information Analysis",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
   "click",
   "ixmp >= 3.11",
@@ -65,7 +65,7 @@ tests = [
   "pint",
   "pooch",
   "pyam-iamc >= 0.6",
-  "pytest >= 5",
+  "pytest >= 9",
   "pytest-cov",
   "pytest-rerunfailures",
   "pytest-xdist",
@@ -103,27 +103,34 @@ module = [
 ]
 ignore_missing_imports = true
 
-[tool.pytest.ini_options]
+[tool.pytest]
 # Disable faulthandler plugin on Windows to prevent spurious console noise
-addopts = """
-  --cov=message_ix --cov-report=
-  -m "not nightly and not rmessageix"
-  -p no:faulthandler"""
+addopts = [
+  "--cov=message_ix",
+  "--cov-report=",
+  '-m "not nightly and not rmessageix"',
+  "-p no:faulthandler",
+]
 # Parallel to .util.ixmp4.configure_logging_and_warnings(), prevent warnings
 # from appearing in the test output
 filterwarnings = [
   "ignore:Accessing the 'model_fields' :DeprecationWarning:ixmp4.db.filters",
   # NB The following don't work if a message regex is added
-  "ignore::pandas.errors.SettingWithCopyWarning:ixmp4.data.db.base",
+  # NB This is SettingWithCopyWarning(Warning), removed in pandas 3.0.0.
+  "ignore::Warning:ixmp4.data.db.base",
   "ignore::DeprecationWarning:sqlalchemy.sql.schema",
 ]
 markers = [
   "ixmp4: tests exclusive to IXMP4Backend.",
+  "ixmp4_209: https://github.com/iiasa/ixmp4/pull/209",
   "jdbc: tests exclusive to JDBCBackend.",
   "nightly: Slow-running nightly tests of particular scenarios.",
   "rmessageix: test of the message_ix R interface.",
   "tutorial: Tests of the tutorial Jupyter notebooks",
 ]
+minversion = "9.0"
+strict_config = true
+strict_markers = true
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
