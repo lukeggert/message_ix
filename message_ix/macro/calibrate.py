@@ -66,6 +66,7 @@ INPUT_DATA = [
     "beta_transport",
     "pei",
     "k_final",
+    "labor",
 ]
 
 
@@ -103,22 +104,20 @@ def aconst(
     # want the series to only have index of node
     return aconst.droplevel("year")
 
-
-def _weight_scale(lakl: "Series", prfconst: "Series") -> "Series":
-    """Scale so lakl + sum(prfconst) = 1 per node, preserving relative weights."""
-    prf_sum = prfconst.groupby(level="node").sum()
-    return 1.0 / (lakl + prf_sum)
-
-
-def _scale_lakl(lakl: "Series", scale: "Series") -> "Series":
-    """Apply per-node scale to lakl."""
-    return lakl * scale
+#def _weight_scale(lakl: "Series", prfconst: "Series") -> "Series":
+#    """Scale so lakl + sum(prfconst) = 1 per node, preserving relative weights."""
+#    prf_sum = prfconst.groupby(level="node").sum()
+#    return 1.0 / (lakl + prf_sum)
 
 
-def _scale_prfconst(prfconst: "Series", scale: "Series") -> "Series":
-    """Apply per-node scale to prfconst."""
-    return prfconst.mul(scale, level="node")
+#def _scale_lakl(lakl: "Series", scale: "Series") -> "Series":
+#    """Apply per-node scale to lakl."""
+#    return lakl * scale
 
+
+#def _scale_prfconst(prfconst: "Series", scale: "Series") -> "Series":
+#    """Apply per-node scale to prfconst."""
+#    return prfconst.mul(scale, level="node")
 
 def add_par(
     scenario: "Scenario", data: "pandas.DataFrame", ym1: int, *, name: str
@@ -146,6 +145,7 @@ class Structures:
     level: set[str]
     node: set[str]
     sector: set[str]
+    #quantile: set[str]
     #: Model years for which MACRO is calibrated.
     year: set[int]
 
@@ -173,11 +173,12 @@ def add_structure(
 
     # Add sectoral set structure
     scenario.add_set("sector", sorted(s.sector))
+    #scenario.add_set("quantile", sorted(s.quantile))
     scenario.add_set("mapping_macro_sector", mapping_macro_sector)
 
 
 def bconst(
-    demand_ref: "DataFrame", gdp0: "Series", price_ref: "DataFrame", rho: "Series"
+    demand_ref: "DataFrame", gdp0: "Series", h: "DataFrame", price_ref: "DataFrame", rho: "Series"
 ) -> "DataFrame":
     """Calculate production function coefficient.
 
@@ -186,7 +187,7 @@ def bconst(
     # TODO automatically get the units here
     # NB(PNK) pandas 1.4.4 automatically drops "year" in the division; pandas 1.5.0
     # does not. Drop here pre-emptively.
-    tmp = ((gdp0 / demand_ref) ** (rho - 1)).droplevel("year")
+    tmp = ((gdp0 / (demand_ref * (1 - h))) ** (rho - 1)).droplevel("year")
     return price_ref / 1e3 * tmp
 
 
@@ -286,6 +287,8 @@ def extrapolate(
         The index does *not* have a ``year`` dimension; the data are implicitly for
         `ym1`.
     """
+    from sys import version_info
+
     from scipy.optimize import curve_fit
 
     def f(x, b, m):
@@ -300,8 +303,11 @@ def extrapolate(
 
     # Apply fitted_intercept to grouped data
     groupby_cols = set(model_data.columns) - {"year", "value"}
+    apply_kwargs = {"include_groups": False} if version_info.minor > 8 else {}
     result = (
-        model_data.groupby(list(groupby_cols)).apply(fitted_intercept).rename("value")
+        model_data.groupby(list(groupby_cols))
+        .apply(fitted_intercept, **apply_kwargs)
+        .rename("value")
     )
 
     # Convert "commodity" and "level" to "sector"
@@ -507,7 +513,7 @@ def _validate_data(name: str | None, df: "DataFrame", s: Structures) -> list:
     list of str
         Dimensions/index sets of the validated MESSAGEix parameter.
     """
-    from . import MACRO
+    from .models import MACRO
 
     # Check required dimensions
     if name is None:
@@ -694,7 +700,7 @@ def prepare_computer(
     """
     from ixmp.backend import ItemType
 
-    from . import MACRO
+    from .models import MACRO
 
     if not base.has_solution():
         raise RuntimeError("Scenario must have a solution to add MACRO")
@@ -734,11 +740,13 @@ def prepare_computer(
     c.add("level::macro", partial(unique_set, "level"), mms)
     c.add("node::macro", partial(unique_set, "node"), "config::macro")
     c.add("sector::macro", partial(unique_set, "sector"), mms)
+    #c.add("quantile::macro", lambda: {f"D{i}" for i in range(1, 11)})
 
     # Periods in `DEMAND` variable and also in `config`
     c.add("year::macro", macro_periods, "DEMAND:y", "config::macro")
 
     # Collect structure information in a class for easier reference
+    #c.add("_s", Structures, *[f"{n}::macro" for n in "level node sector year quantile".split()])
     c.add("_s", Structures, *[f"{n}::macro" for n in "level node sector year".split()])
 
     # Collection of keys to run to check input data formats
@@ -791,20 +799,24 @@ def prepare_computer(
         "ym1",
     )
     c.add("demand_MESSAGE", demand, cleaned["DEMAND"], "demand_ref", mms, "ym1")
-    c.add("prfconst_raw", bconst, "demand_ref", "historical_gdp", "price_ref", "rho")
+#    c.add("prfconst_raw", bconst, "demand_ref", "historical_gdp", "price_ref", "rho")
+#    c.add(
+#        "lakl_raw",
+#        aconst,
+#        "prfconst_raw",
+#        "demand_ref",
+#        "historical_gdp",
+#        "k0",
+#        "kpvs",
+#        "rho",
+#    )
+#    c.add("weight_scale", _weight_scale, "lakl_raw", "prfconst_raw")
+#    c.add("prfconst", _scale_prfconst, "prfconst_raw", "weight_scale")
+#    c.add("lakl", _scale_lakl, "lakl_raw", "weight_scale")
+    c.add("prfconst", bconst, "demand_ref", "historical_gdp", "h", "price_ref", "rho")
     c.add(
-        "lakl_raw",
-        aconst,
-        "prfconst_raw",
-        "demand_ref",
-        "historical_gdp",
-        "k0",
-        "kpvs",
-        "rho",
+        "lakl", aconst, "prfconst", "demand_ref", "historical_gdp", "k0", "kpvs", "rho"
     )
-    c.add("weight_scale", _weight_scale, "lakl_raw", "prfconst_raw")
-    c.add("prfconst", _scale_prfconst, "prfconst_raw", "weight_scale")
-    c.add("lakl", _scale_lakl, "lakl_raw", "weight_scale")
 
     # Add the data to the scenario for each MACRO parameter. Some of these are directly
     # from the input (also appearing in VERIFY_INPUT_DATA); others are from calculations

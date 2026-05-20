@@ -1,3 +1,5 @@
+$OPTION MCP = PATH ;
+
 * ------------------------------------------------------------------------------
 * Start values of variables inside feasible domain (positive variables)
 * ------------------------------------------------------------------------------
@@ -48,7 +50,7 @@ YE.L(node_macro, sector, year) = enestart(node_macro, sector, year) / aeei_facto
 *E.L(node_macro, sector, year) = h(node_macro, sector) * enestart(node_macro, sector, year) / aeei_factor(node_macro, sector, year);
 
 C.L(node_macro, macro_horizon) = gdp_calibrate(node_macro, macro_horizon)/ 1000 - (SVKN(node_macro, macro_horizon) * (grow(node_macro, macro_horizon) + depr(node_macro))) - ecst0(node_macro)/1000 ;
-Y.L(node_macro, macro_horizon) = gdp_calibrate(node_macro, macro_horizon) / 1000 ; 
+*Y.L(node_macro, macro_horizon) = gdp_calibrate(node_macro, macro_horizon) / 1000 ; 
 
 $ontext
 E.L(node_macro, sector, macro_horizon) $ sameas(sector, 'rc_spec') =
@@ -132,67 +134,40 @@ newene_share_cap(node_macro, sector, year) = duration_period(year) / 1 ;
 * qunatile values
 
 * When different betas and alphas: ohne lower für cap und con optimal solution, aber single values for a specific quantile. With lower no solution
-* YE lower bound: prevents rPower domain error in FOC_YE (YE**(rho-1) undefined at YE=0)
-* epsilon is too small: with rho-1 ≈ -1.14, YE=1e-6 gives YE^(rho-1) ≈ 4e6 -> Jacobian blows up.
-* Use LOTOL * enestart(t) / aeei_factor(t) = LOTOL * YE.L as a meaningful floor.
-* YE.FX for macro_base_period is set below, so this only affects non-base periods.
-* Only applies to sectors with h < 1 (productive energy contribution).
-* YE wird durch ENERGY_ACCOUNTING_MCP.YE bestimmt (YE = TE - E = PHYSENE/aeei - E).
-* YE.LO verhindert YE^(rho-1) domain error in FOC_YE (rho-1 < 0).
-* LOTOL * enestart/aeei ist ein sinnvoller Minimalwert (Bruchteil des Startwerts).
-*YE.LO(node_macro, sector, macro_horizon)$(NOT macro_base_period(macro_horizon) AND h(node_macro, sector) < 1) =
-*    MAX(epsilon,
-*        LOTOL(node_macro) * enestart(node_macro, sector, macro_horizon) / aeei_factor(node_macro, sector, macro_horizon)
-*    ) ;
-* Fuer h=1 Sektoren: YE = (1-h)*TE = 0, wird durch YE.FX(base) und ENERGY_ACCOUNTING gesetzt.
-
 KAP.LO(node_macro, macro_horizon, quantile) = LOTOL(node_macro) * k0(node_macro) * quantile_share(quantile) ;
 CON.LO(node_macro, macro_horizon, quantile) = LOTOL(node_macro) * c0(node_macro) * quantile_share(quantile) ;
+*LAB.LO(node_macro, macro_horizon, quantile) = 0 ;
 
-KAP.FX(node_macro, macro_base_period, quantile) = k0(node_macro) * quantile_share(quantile) ;
-CON.FX(node_macro, macro_base_period, quantile) = c0(node_macro) * quantile_share(quantile) ;
+*KAP.FX(node_macro, macro_base_period, quantile) = k0(node_macro) * quantile_share(quantile) ;
+*CON.FX(node_macro, macro_base_period, quantile) = c0(node_macro) * quantile_share(quantile) ;
 *LAB.FX(node_macro, macro_base_period, quantile) = labor(node_macro, macro_base_period) * quantile_share(quantile) ;
 
-* Startwerte fuer Quantilvariablen: proportional zum Aggregat
-* Ohne diese Initialisierung starten CON und KAP bei 0 (< LB),
-* PATH setzt sie sofort auf die LB, und der Jacobian 1/CON^2 wird riesig
-KAP.L(node_macro, macro_horizon, quantile)$(NOT macro_base_period(macro_horizon)) =
-    MAX(LOTOL(node_macro) * k0(node_macro) * quantile_share(quantile),
-        K.L(node_macro, macro_horizon) * quantile_share(quantile)) ;
-CON.L(node_macro, macro_horizon, quantile)$(NOT macro_base_period(macro_horizon)) =
-    MAX(LOTOL(node_macro) * c0(node_macro) * quantile_share(quantile),
-        MAX(c0(node_macro), C.L(node_macro, macro_horizon)) * quantile_share(quantile)) ;
+KAP.L(node_macro, macro_horizon, quantile) = K.L(node_macro, macro_horizon) * quantile_share(quantile) ;
+CON.L(node_macro, macro_horizon, quantile) = C.L(node_macro, macro_horizon) * quantile_share(quantile) ;
 LAB.L(node_macro, macro_base_period, quantile) = labor(node_macro, macro_base_period) * quantile_share(quantile) ;
 
-
 * Initialisierung aller Dualvariablen (MU_*) mit kleinem positiven Wert
-*MU_KAP.L(node_macro, macro_horizon, quantile) = 1e-3 ;
-* Konsistente Startwerte aus FOC_CON = 0:
-*   MU_KAP = 1000*udf*alpha_q / (CON.L * qs)  [CON.L ist jetzt bereits initialisiert]
-* I_HH Startwerte: proportional zu aggregiertem I, skaliert mit quantile_share
-* Fuer base_period: I_HH = i0 * qs (konsistent mit Kapitalakkumulation)
-* KAP_DYN ist jetzt fuer ALLE non-base Perioden aktiv -> MU_KAP fuer alle initialisieren
-MU_KAP.L(node_macro, macro_horizon, quantile)$(NOT macro_base_period(macro_horizon)
-        AND quantile_share(quantile) > 0) =
-    1000 * udf(node_macro, macro_horizon) * alpha_q(node_macro, quantile)
-    / (CON.L(node_macro, macro_horizon, quantile)) ;
-
-* I_HH initialisieren
-I_HH.L(node_macro, macro_horizon, quantile)$(NOT macro_base_period(macro_horizon)
-        AND NOT last_period(macro_horizon)) =
-    I.L(node_macro, macro_horizon) * quantile_share(quantile) ;
-I_HH.L(node_macro, macro_horizon, quantile)$last_period(macro_horizon) =
-    KAP.L(node_macro, macro_horizon, quantile) * (grow(node_macro, macro_horizon) + depr(node_macro)) ;
-
-* MU_TERMINAL_HH = Dual zu TERMINAL_HH_MCP: I_HH(T) = KAP(T)*(KGROW+depr)
-* Aus FOC_KAP_LAST: MU_KAP(T) = MU_TERMINAL_HH(T)*(KGROW+depr)
-* -> MU_TERMINAL_HH(T) = MU_KAP(T)/(KGROW+depr)
-MU_TERMINAL_HH.L(node_macro, macro_horizon, quantile)$(last_period(macro_horizon)
-        AND quantile_share(quantile) > 0) =
-    1000 * udf(node_macro, macro_horizon) * alpha_q(node_macro, quantile)
-    / (CON.L(node_macro, macro_horizon, quantile) * (grow(node_macro, macro_horizon) + depr(node_macro))) ;
-
-DISPLAY CON.L, alpha_q, MU_KAP.L, C.L ;
+MU_CAPITAL.L(node_macro, macro_horizon, quantile)$(CON.L(node_macro, macro_horizon, quantile) > 0) =
+  hh_scale * udf(node_macro, macro_horizon) / (CON.L(node_macro, macro_horizon, quantile)) ;
+MU_KAP.L(node_macro, macro_horizon, quantile) = 1e-3 ;
+MU_INV.L(node_macro, macro_horizon, quantile) = 1e-3 ;
+LAMBDA_CAP.L(node_macro, macro_horizon) = 1e-3 ;
+MU_PROD.L(node_macro, macro_horizon) = 1e-3 ;
+MU_MPK.L(node_macro, macro_horizon) = 1e-3 ;
+MU_MPL.L(node_macro, macro_horizon) = 1e-3 ;
+mu_ENERGY_ACCOUNTING.L(node_macro, sector, macro_horizon) = 1e-3 ;
+mu_ENERGY_ACCOUNTING2.L(node_macro, sector, macro_horizon) = 1e-3 ;
+mu_ENERGY_SUPPLY.L(node_macro, sector, macro_horizon) = 1e-3 ;
+MU_AGG_KAP.L(node_macro, macro_horizon) = 1e-3 ;
+MU_AGG_CON.L(node_macro, macro_horizon) = 1e-3 ;
+MU_AGG_INV.L(node_macro, macro_horizon) = 1e-3 ;
+MU_CAP_USE.L(node_macro, macro_horizon) = 1e-3 ;
+MU_TERM_COND.L(node_macro) = 1e-3 ;
+MU_HH_UTILITY_REP.L = 1e-3 ;
+MU_FOC_CON.L(node_macro, macro_horizon, quantile) = 1e-3 ;
+MU_FOC_KAP.L(node_macro, macro_horizon, quantile) = 1e-3 ;
+MU_LABOR_MARKET.L(node_macro, macro_horizon) = 1e-3 ;
+MU_TERMINAL_HH.L(node_macro, macro_horizon, quantile) = 1e-3 ;
 
 * DLE:
 
@@ -208,7 +183,7 @@ DISPLAY CON.L, alpha_q, MU_KAP.L, C.L ;
 
 * division by aeei_factor is necesary in case MACRO starts after initialize_period (in case of slicing)
 TE.FX(node_macro, sector, macro_base_period) = demand_base(node_macro, sector) / aeei_factor(node_macro, sector, macro_base_period) ;
-YE.FX(node_macro, sector, macro_base_period) = (1-h(node_macro, sector)) * demand_base(node_macro, sector) / aeei_factor(node_macro, sector, macro_base_period) ;
+*YE.FX(node_macro, sector, macro_base_period) = (1-h(node_macro, sector)) * demand_base(node_macro, sector) / aeei_factor(node_macro, sector, macro_base_period) ;
 E.FX(node_macro, sector, macro_base_period) = h(node_macro, sector) * demand_base(node_macro, sector) / aeei_factor(node_macro, sector, macro_base_period) ;
 
 Y.FX(node_macro, macro_base_period) = y0(node_macro) ;
@@ -269,10 +244,9 @@ LOOP(node$ (node_macro(node) AND sameas(node, "R12_AFR")),
   node_active(node) = YES ;
 *  DISPLAY node_active ;
 
-  OPTION MCP = PATH ;
-
   SOLVE MESSAGE_MACRO USING MCP ;
 
+* Write model status summary for the current node
 *  status(node,'modelstat') = MESSAGE_MACRO.modelstat ;
 *  status(node,'solvestat') = MESSAGE_MACRO.solvestat ;
 *  status(node,'resUsd')    = MESSAGE_MACRO.resUsd ;
@@ -286,9 +260,7 @@ DISPLAY "Solve MACRO for all nodes concurrently";
 
 node_active(node_macro) = YES;
 
-OPTION MCP = PATH ;
-
-SOLVE MESSAGE_MACRO USING MCP ;
+SOLVE MESSAGE_MACRO MAXIMIZING UTILITY USING NLP;
 
 * Write model status summary for all nodes
 * status('all','modelstat') = MESSAGE_MACRO.modelstat;

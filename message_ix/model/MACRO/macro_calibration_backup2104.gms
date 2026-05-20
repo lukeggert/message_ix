@@ -3,6 +3,7 @@ Parameters
          demand_new(node,sector,year_all)
          aeei_correction(node,sector,year_all)
          growth_correction(node,year_all)
+         growth_step(node,year_all)
          gdp_scale(node, year_all)
          gdp_mer_macro(node, year_all)
          test_ye(node, year_all)
@@ -14,7 +15,12 @@ Scalar
          aeei_relax      / 1 /
          aeei_min_bound  / -0.2 /
          aeei_max_bound  / 0.2 /
+         growth_relax    / 0.3 /
+         growth_step_max / 0.02 /
          labor_growth_scale / 1 /
+         grow_min_bound  / -0.05 /
+         grow_max_bound  / 0.08 /
+         tiny_value      / 1e-9 /
 ;
 
 Variables
@@ -55,19 +61,19 @@ If (mod(ctr, 2) eq 0,
     grow(node_macro,year) = grow(node_macro,year) + growth_correction(node_macro,year) ;
 Elseif mod(ctr, 2) eq 1,
 * calculate correction factor for aeei and apply for next iteration of MACRO
-    aeei_correction(node_macro,sector,year) $ (NOT macro_base_period(year)) = SUM(year2 $ seq_period(year2,year), ((demand_new(node_macro,sector,year)/demand_MESSAGE(node_macro,sector,year)) / (demand_new(node_macro,sector,year2)/demand_MESSAGE(node_macro,sector,year2)))**(1/duration_period(year)) - 1) ;
-    aeei(node_macro,sector,year) = aeei(node_macro,sector,year) + aeei_correction(node_macro,sector,year);
+    aeei_correction(node_macro,sector,year) $ (NOT macro_base_period(year)) =
+        1 - demand_scale(node_macro,sector,year)**(-1 / duration_period(year)) ;
+    aeei(node_macro,sector,year) $ (NOT macro_base_period(year)) =
+        MIN(
+            aeei_max_bound,
+            MAX(
+                aeei_min_bound,
+                aeei(node_macro,sector,year) + aeei_relax * aeei_correction(node_macro,sector,year)
+            )
+        ) ;
 ) ;
 DISPLAY demand_scale, aeei_correction ;
 DISPLAY growth_correction, gdp_mer_macro, gdp_scale ;
-
-
-* Use original AEEI correction formula
-*    aeei_correction(node_macro,sector,year) $ (NOT macro_base_period(year)) = 
-*        SUM(year2 $ seq_period(year2,year), 
-*        (demand_scale(node_macro,sector,year) / demand_scale(node_macro,sector,year2))**(1/duration_period(year)) - 1) ;
-* Simple addition without bounds
-*    aeei(node_macro,sector,year) = aeei(node_macro,sector,year) + aeei_correction(node_macro,sector,year) ;
 
 * ------------------------------------------------------------------------------
 * recalculation of parameters that are AEEI or growth dependent
@@ -118,7 +124,7 @@ LOOP(year_all $( ORD(year_all) > sum(year_all2$( macro_initial_period(year_all2)
 *   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - (drate(node_macro) - grow(node_macro, year_all)))**duration_period(year_all)) ;
    udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - drate(node_macro))**duration_period(year_all)) ;
 );
-DISPLAY labor, udf ;
+DISPLAY labor ;
 
 * recalcualte finite time horizon correction of utility function
 *finite_time_corr(node_macro, year) = abs(drate(node_macro) - grow(node_macro, year)) ;

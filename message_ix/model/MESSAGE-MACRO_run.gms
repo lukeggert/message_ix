@@ -165,6 +165,13 @@ eneprice(node_macro,sector,year)$(NOT macro_base_period(year)) = SUM(
     PRICE_COMMODITY.L(node_macro,commodity,level,year,time) * duration_time(time)
 );
 
+* If eneprice is 0, carry forward the last available non-zero value.
+* The loop over ordered years ensures this also works for multiple consecutive zero periods.
+loop(year$(NOT macro_base_period(year)),
+    eneprice(node_macro,sector,year)$(eneprice(node_macro,sector,year) = 0) =
+        SUM(year2$(seq_period(year2,year)), eneprice(node_macro,sector,year2));
+);
+
 * Absolute difference in prices
 price_diff_abs(iteration,node_macro,sector,year)$price_init(node_macro,sector,year) = (
     eneprice(node_macro,sector,year)
@@ -181,6 +188,9 @@ price_init(node_macro,sector,year) = SUM(
   (commodity,level,time)$mapping_macro_sector(sector,commodity,level),
   PRICE_COMMODITY.L(node_macro,commodity,level,year,time)
 );
+
+* add cost exchange as well:
+total_cost(node_macro,year) = COST_NODAL_NET.L(node_macro,year) / 1000 ;
 
 DISPLAY enestart, eneprice, total_cost ;
 

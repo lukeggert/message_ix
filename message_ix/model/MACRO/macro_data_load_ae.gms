@@ -39,8 +39,6 @@ Sets
     node_macro(node) nodes actually relevant for the MACRO mode
     node_active(node)   active node - region - grid cell
     sector      Energy Sectors for macro-economic analysis in MACRO
-    quantile    Household income quantiles
-        / D1*D5 /
     mapping_macro_sector(sector, commodity, level) mapping of energy sectors in MACRO to MESSAGE commodity and level combinations
 ;
 
@@ -51,15 +49,6 @@ SCALAR node_counter   'node counter for looping over regions' ;
 SCALAR  epsilon            small number to avoid divergences
         / 0.01 /
 ;
-
-SCALAR  pareto_alpha       'Pareto shape parameter for income distribution (must be > 1)'
-    / 2.0 /
-;
-
-SCALAR  gamma_decile       'Steepness of energy share gradient across income deciles (0=flat, 1=linear, higher=steeper)'
-    / 0.6 /
-;
-
 
 PARAMETERS
          i0(node)                    Initial investment in base year
@@ -102,11 +91,7 @@ PARAMETERS
 
          udf(node, year_all)             Utility discount factor in period year
          labor(node, year_all)           Labor force (efficiency units) in period year
-         newlab(node, year_all)          New vintage of labor force in period year
          grow(node, year_all)            Annual growth rates of potential GDP
-         tfp(node, year_all)
-         q_newte(node,sector,year_all)
-         newene_share_cap(node, sector, year_all)
 
          aeei(node, sector, year_all)    Annual potential decrease of energy intensity in sector sector
          aeei_factor(node, sector, year_all) Cumulative effect of autonomous energy efficiency improvement (AEEI)
@@ -116,22 +101,8 @@ PARAMETERS
 
          SVKN(node, year_all)    'start values for new capital variable KN'
          SVNEWE(node, sector, year_all)    'start values for new energy variable'
-         SVTE(node, sector, year_all)
-
-         quantile_share(quantile)  'Income share of each household quantile derived from Pareto distribution'
-         e_q_min(node, sector, year_all) 'Minimum path for direct household energy by sector and year, applied to every quantile'
 
          historical_gdp(node,year_all)     historical GDP used for the base year (including running MACRO with slicing)
-
-         decile_energy_wt(quantile)        'Unnormalized energy share weights by decile rank (D1=poorest=highest weight)'
-         beta_total_agg(node)              'Aggregate total direct energy beta (sum of three sector betas)'
-         alpha_q(node, quantile)           'Quantile-specific consumption preference share'
-         beta_rc_spec_q(node, quantile)    'Quantile-specific residential specific electricity energy share'
-         beta_rc_therm_q(node, quantile)   'Quantile-specific residential thermal energy share'
-         beta_transport_q(node, quantile)  'Quantile-specific transport energy share'
-
-         aconst(node)                       'Production function coefficient of capital-labor nest (calibrated)'
-         bconst(node, sector)               'Production function coefficient of energy sectors (calibrated)'
 ;
 Parameters
 * general parameters
@@ -168,20 +139,15 @@ $LABEL macro_data
 
 $LOAD type_node,cat_node
 $LOAD sector,mapping_macro_sector
-*$LOAD quantile
-$LOAD kpvs,kgdp,esub,depr,lotol,k_final
+$LOAD kpvs,kgdp,esub,depr,drate,lotol,alpha,EMIN,beta_rc_spec,beta_rc_therm,beta_transport,k_final
+$LOAD h
 $LOAD lakl,prfconst
 $LOAD aeei,grow
 $LOAD gdp_calibrate,historical_gdp
-$LOAD demand_MESSAGE,cost_MESSAGE
-$LOAD price_MESSAGE
-$LOAD EMIN,drate
-*$LOAD alpha,beta_rc_spec,beta_rc_therm,beta_transport
-*$LOAD h
+$LOAD demand_MESSAGE,price_MESSAGE,cost_MESSAGE
 
 * Note: pei is maybe loaded separately from pei_data.gdx file below
-*$LOAD pei
-*$LOAD labor
+*$LOAD pei,labor
 $GDXIN
 
 *----------------------------------------------------------------------------------------------------------------------*
@@ -189,13 +155,9 @@ $GDXIN
 *----------------------------------------------------------------------------------------------------------------------*
 
 * Load pei values from separate wage-specific GDX file
-$GDXIN '/home/lukas/environments/macro_uba/lib/python3.10/site-packages/message_ix/model/test_1504.gdx'
-*$LOAD pei
-*$LOAD labor
-$LOAD alpha,beta_rc_spec,beta_rc_therm,beta_transport
-$LOAD h
-*$LOAD EMIN,drate
-*$LOAD price_MESSAGE
+$GDXIN '/home/lukas/environments/macro_uba/lib/python3.10/site-packages/message_ix/model/output/MsgOutput_MESSAGEix_ssp2_baseline_0603_add_macro.gdx'
+$LOAD pei
+$LOAD labor
 $GDXIN
 
 node_macro(node)$( cat_node('economy',node) ) = yes ;
@@ -241,69 +203,7 @@ $LABEL macro_input_end
 * base year useful energy/service demand levels from MESSAGE get mapped onto MACRO sector structure
 demand_base(node_macro,sector) = sum(macro_base_period, enestart(node_macro,sector,macro_base_period) ) ;
 
-
 DISPLAY enestart, eneprice, total_cost;
-
-* ------------------------------------------------------------------------------
-* Minimum path for direct household energy by sector and year.
-* This lower bound is applied to E_Q for each quantile in household sectors.
-* Default behavior keeps the previous 0.001 floor for household sectors, while
-* i_spec and i_therm stay at 0 unless the values below are overridden.
-* ------------------------------------------------------------------------------
-
-*e_q_min(node_macro, sector, year)$(NOT macro_base_period(year)) = 0.001 ;
-*e_q_min(node_macro, 'i_spec', year)$(NOT macro_base_period(year)) = 0 ;
-*e_q_min(node_macro, 'i_therm', year)$(NOT macro_base_period(year)) = 0 ;
-
-*DISPLAY e_q_min ;
-
-* ------------------------------------------------------------------------------
-* Compute quantile income shares from Pareto Lorenz curve
-* Formula:  share_i = (1 - (i-1)/n)^((alpha-1)/alpha) - (1 - i/n)^((alpha-1)/alpha)
-* This is consistent with a Pareto distribution with shape parameter pareto_alpha.
-* By construction the shares sum to exactly 1 (telescoping sum).
-* ------------------------------------------------------------------------------
-
-quantile_share(quantile) =
-    ( 1 - (ORD(quantile)-1) / CARD(quantile) ) ** ( (pareto_alpha-1) / pareto_alpha )
-    - ( 1 - ORD(quantile)   / CARD(quantile) ) ** ( (pareto_alpha-1) / pareto_alpha ) ;
-
-DISPLAY pareto_alpha, quantile_share ;
-
-* ------------------------------------------------------------------------------
-* Compute quantile-specific preference parameters (alpha_q, beta_*_q)
-* Energy expenditure share is empirically regressive: lower income deciles
-* spend a larger fraction of consumption on direct energy (Engel's law).
-* We use a power-law gradient (11 - decile_rank)^gamma_decile, normalized so
-* the arithmetic mean across deciles equals the aggregate parameter value.
-* This ensures the aggregate calibration is exactly preserved.
-*
-* D1 = poorest (rank 1, highest energy share)
-* D10 = richest (rank 10, lowest energy share)
-*
-* gamma_decile = 0: uniform (all deciles get aggregate value)
-* gamma_decile = 0.6: moderate gradient (default, D1 ~1.5x, D10 ~0.4x aggregate)
-* gamma_decile = 1.0: steep gradient (D1 ~2.3x, D10 ~0.3x aggregate)
-* ------------------------------------------------------------------------------
-
-SCALAR decile_wt_sum 'Sum of unnormalized decile weights for normalization' ;
-
-decile_energy_wt(quantile) = (6 - ORD(quantile)) ** gamma_decile ;
-decile_wt_sum = SUM(quantile, decile_energy_wt(quantile)) ;
-
-beta_total_agg(node_macro) = beta_rc_spec(node_macro) + beta_rc_therm(node_macro) + beta_transport(node_macro) ;
-
-* Quantile-specific sector betas: scaled so arithmetic mean = aggregate value
-beta_rc_spec_q(node_macro, quantile)   = beta_rc_spec(node_macro)   * CARD(quantile) * decile_energy_wt(quantile) / decile_wt_sum ;
-beta_rc_therm_q(node_macro, quantile)  = beta_rc_therm(node_macro)  * CARD(quantile) * decile_energy_wt(quantile) / decile_wt_sum ;
-beta_transport_q(node_macro, quantile) = beta_transport(node_macro) * CARD(quantile) * decile_energy_wt(quantile) / decile_wt_sum ;
-
-* alpha_q: residual, ensures alpha_q + sum_s(beta_s_q) = 1 for each decile
-alpha_q(node_macro, quantile) = 1 - beta_rc_spec_q(node_macro, quantile)
-                                  - beta_rc_therm_q(node_macro, quantile)
-                                  - beta_transport_q(node_macro, quantile) ;
-
-DISPLAY gamma_decile, decile_energy_wt, alpha, alpha_q, beta_rc_spec_q, beta_rc_therm_q, beta_transport_q ;
 
 * ------------------------------------------------------------------------------
 * calculate start values
@@ -334,7 +234,7 @@ LOOP(year_all $ ( ORD(year_all) > sum(year_all2$( macro_initial_period(year_all2
 aeei_factor(node_macro, sector, year_all) = SUM(year_all2$( seq_period(year_all2,year_all) ), ( (1 - aeei(node_macro, sector, year_all)) ** duration_period(year_all) ) * aeei_factor(node_macro, sector, year_all2))
 );
 
-DISPLAY aeei_factor, EMIN ;
+DISPLAY aeei_factor ;
 
 * ------------------------------------------------------------------------------
 * calculation of total labor supply, new labor supply and utility discount factor
@@ -345,19 +245,13 @@ rho(node_macro) = (esub(node_macro) - 1)/esub(node_macro) ;
 DISPLAY rho ;
 
 udf(node_macro, macro_initial_period)   = 1 ;
-labor(node_macro, macro_initial_period) = 1 ;
 
 LOOP(year_all $( ORD(year_all) > sum(year_all2$( macro_initial_period(year_all2) ), ORD(year_all2) ) ),
-* exogenous labor supply growth (including both changes in labor force and labor productivity growth)
-    labor(node_macro, year_all)  = SUM(year_all2$( seq_period(year_all2,year_all) ), labor(node_macro, year_all2) * (1 + grow(node_macro, year_all))**duration_period(year_all)) ;
-* new labor supply
-    newlab(node_macro, year_all) = SUM(year_all2$( seq_period(year_all2,year_all) ), (labor(node_macro, year_all) - labor(node_macro, year_all2)*(depr(node_macro))**duration_period(year_all))$((labor(node_macro, year_all) - labor(node_macro, year_all2)*(1 - depr(node_macro))**duration_period(year_all)) > 0)) + epsilon ;
 * calculation of utility discount factor based on discount rate (drate)
-*    udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - (drate(node_macro) - grow(node_macro, year_all)))**duration_period(year_all)) ;
-    udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - drate(node_macro))**duration_period(year_all)) ;
+   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - drate(node_macro))**duration_period(year_all)) ;
 );
 
-DISPLAY labor, newlab, udf;
+DISPLAY udf;
 
 * ------------------------------------------------------------------------------
 * Calculation of base year energy system costs, capital stock and GDP components (investment, consumption, production)
@@ -377,30 +271,7 @@ LOOP(macro_base_period,
 c0(node_macro) = gdp_base(node_macro) - i0(node_macro) - ecst0(node_macro)/1000 ;
 y0(node_macro) = gdp_base(node_macro) ;
 
-q_newte(node_macro,sector,year_all) = 0.001 ;
-
-* ------------------------------------------------------------------------------
-* Calculation of production function coefficients ACONST and BCONST
-* These are calibrated to base-year (2025) data and replace the former
-* equation-based definitions ACONST_EQU / BCONST_EQU in macro_core.gms.
-* ------------------------------------------------------------------------------
-
-bconst(node_macro, sector) =
-    (eneprice(node_macro, sector, '2025') / 1e3)
-    * (((gdp_base(node_macro) / ((enestart(node_macro, sector, '2025') * (1 - h(node_macro, sector))))) ** (rho(node_macro) - 1))) ;
-
-aconst(node_macro) =
-    ( (gdp_base(node_macro))**rho(node_macro)
-        - ( prfconst(node_macro,'i_spec')    * (enestart(node_macro, 'i_spec',    '2025') * 1000)**(rho(node_macro))
-          + prfconst(node_macro,'i_therm')   * (enestart(node_macro, 'i_therm',   '2025') * 1000)**(rho(node_macro))
-          + prfconst(node_macro,'rc_spec')   * (enestart(node_macro, 'rc_spec',   '2025') * 1000)**(rho(node_macro))
-          + prfconst(node_macro,'rc_therm')  * (enestart(node_macro, 'rc_therm',  '2025') * 1000)**(rho(node_macro))
-          + prfconst(node_macro,'transport') * (enestart(node_macro, 'transport', '2025') * 1000)**(rho(node_macro)) ) )
-    / k0(node_macro)**(rho(node_macro)*kpvs(node_macro)) ;
-
-DISPLAY aconst, bconst ;
-
-DISPLAY ecst0, k0, i0, c0, y0, prfconst, lakl, bconst, aconst, h ;
+DISPLAY ecst0, k0, i0, c0, y0 ;
 
 * ------------------------------------------------------------------------------
 * Introduced fix for running MACRO myopically when the finite time horizon correction
@@ -409,5 +280,4 @@ DISPLAY ecst0, k0, i0, c0, y0, prfconst, lakl, bconst, aconst, h ;
 * simply taken.
 * ------------------------------------------------------------------------------
 
-*finite_time_corr(node_macro, year) = abs(drate(node_macro) - grow(node_macro, year)) ;
-finite_time_corr(node_macro, year) = abs(drate(node_macro)) ;
+finite_time_corr(node_macro, year) = abs(drate(node_macro) - grow(node_macro, year)) ;

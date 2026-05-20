@@ -1,2 +1,7 @@
 LFILOG 50
 LFILOS 50
+
+* Loosening the triangular feasibility tolerance  
+tol_feas_tria 1e-4
+* Loosening the optimality tolerance
+RTREDG 1.0e-4

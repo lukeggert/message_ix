@@ -1,387 +1,377 @@
-***
-* .. _macro-core:
-*
-* MACRO core formulation
-* ======================
-*
-* MACRO is a macroeconomic model maximizing the intertemporal utility function of a single representative producer-consumer
-* in each node (or macro-economic region). The optimization result is a sequence of optimal savings, investment, and consumption decisions.
-* The main variables of the model are the capital stock, available labor, and commodity inputs, which together determine the
-* total output of an economy according to a nested constant elasticity of substitution (CES) production function. End-use service
-* demands in the (commercial) demand categories of MESSAGE is determined within the model, and is consistent with commodity
-* supply curves, which are inputs to the model.
-*
-***
+$TITLE MACRO core MCP formulation with 10 Haushaltsdezi
+$EOLCOM #
 
-*----------------------------------------------------------------------------------------------------------------------*
-* Notation declaration                                                                                                 *
-*----------------------------------------------------------------------------------------------------------------------*
+* cd /home/lukas/environments/macro_uba/lib/python3.10/site-packages/message_ix/model && gams MACRO_run.gms --in=/home/lukas/environments/macro_uba/lib/python3.10/site-packages/message_ix/model/data/MsgData_MESSAGEix_ssp2_baseline_2304_add_macro.gdx --out=/home/lukas/environments/macro_uba/lib/python3.10/site-packages/message_ix/model/test_1305_mcp.gdx > MACRO_run_smart_calibration.log 2>&1
 
-***
-* Notation declaration
-* ~~~~~~~~~~~~~~~~~~~~
-* The following short notation is used in the mathematical description relative to the GAMS code:
-*
-* ============== =============================== ===================================================================
-* Math Notation  GAMS set & index notation       Description
-* ============== =============================== ===================================================================
-* :math:`n`      node (or node_active in loops)  spatial node corresponding to the macro-economic MESSAGE regions
-* :math:`y`      year                            year (2005, 2010, 2020, ..., 2100)
-* :math:`s`      sector                          sector corresponding to the (commercial) end-use demands of MESSAGE
-* ============== =============================== ===================================================================
-*
-* A listing of all parameters used in MACRO together with a decription can be found in the table below.
-*
-* ================================== ================================================================================================================================
-* Parameter                          Description
-* ================================== ================================================================================================================================
-* :math:`\text{period}_t`            Number of years in time period :math:`t` (forward diff)
-* :math:`\text{total_cost}_{n,t}`    Total system costs in region :math:`n` and period :math:`t` from MESSAGE model run
-* :math:`\text{enestart}_{n,s,t}`    Consumption level of (commercial) end-use services :math:`s` in region :math:`n` and period :math:`t` from MESSAGE model run
-* :math:`\text{eneprice}_{n,s,t}`    Shadow prices of (commercial) end-use services :math:`s` in region :math:`n` and period :math:`t` from MESSAGE model run
-* :math:`\text{E}_{min,n,s,t}`       Subsistence level of direct energy consumption (end-use service) in region :math:`n`, sector :math:`s` and period :math:`t`
-* :math:`\text{h}_{n,s,t}`           Share of the direct energy consumption of the total energy production in region :math:`n`, sector :math:`s` and period :math:`t`
-
-* :math:`\epsilon_n`                 Elasticity of substitution between capital-labor and total energy in region :math:`n`
-* :math:`\rho_n`                     :math:`\epsilon - 1 / \epsilon` where :math:`\epsilon` is the elasticity of substitution in region :math:`n`
-* :math:`\beta_n`                    Consumption value share parameter in region :math:`n`
-* :math:`\sigma_{n,s}`               Direct energy consumption value share parameter in region :math:`n` and of sector :math:`s`
-* :math:`\delta_n`                   Annual depreciation rate in region :math:`n`
-* :math:`\alpha_n`                   Capital value share parameter in region :math:`n`
-* :math:`a_n`                        Production function coefficient of capital and labor in region :math:`n`
-* :math:`b_{n,s}`                    Production function coefficients of the different end-use sectors in region :math:`n`, sector :math:`s` and period :math:`t`
-* :math:`\text{udf}_{n,t}`           Utility discount factor in period year in region :math:`n` and period :math:`t`
-* :math:`\text{L}_{n,t}`             Labor force in region :math:`n` and period :math:`t`
-* :math:`\text{grow}_{n,t}`          Annual growth rates of potential GDP in region :math:`n` and period :math:`t`
-* :math:`\text{aeei}_{n,s,t}`        Autonomous energy efficiency improvement (AEEI) in region :math:`n`, sector :math:`s` and period :math:`t`
-* :math:`\text{fin_time}_{n,t}`      Finite time horizon correction factor in utility function in region :math:`n` and period :math:`t`
-* ================================== ================================================================================================================================
-***
-
-*----------------------------------------------------------------------------------------------------------------------*
-* Variable definitions                                                                                                 *
-*----------------------------------------------------------------------------------------------------------------------*
-
-***
-* Decision variables
-* ~~~~~~~~~~~~~~~~~~~~
-*
-* =============================== =========================================================== ==============================================================================================================
-* Variable                        Definition                                                  Description
-* =============================== =========================================================== ==============================================================================================================
-* :math:`\text{K}_{n,y}`          :math:`\text{K}_{n, y}\geq 0 ~ \forall n, y`                Capital stock in region :math:`n` and period :math:`y`
-* :math:`\text{Y}_{n,y}`          :math:`\text{Y}_{n, y}\geq 0 ~ \forall n, y`                Total production in region :math:`n` and period :math:`y`
-* :math:`\text{C}_{n,y}`          :math:`\text{C}_{n, y}\geq 0 ~ \forall n, y`                Consumption in region :math:`n` and period :math:`y`
-* :math:`\text{I}_{n,y}`          :math:`\text{I}_{n, y}\geq 0 ~ \forall n, y`                Investment in region :math:`n` and period :math:`y`
-* :math:`\text{WAGE}`             :math:`\text{WAGE} \in \left[-\infty..\infty\right]`        Effective wage in region :math:`n` and period :math:`y`
-* :math:`\text{KGROW}`            :math:`\text{KGROW} \in \left[-\infty..\infty\right]`       Capital growth in region :math:`n` and period :math:`y`
-* :math:`\text{PHYSENE}_{n,s,y}`  :math:`\text{PHYSENE}_{n, s, y}\geq 0 ~ \forall n, s, y`    Physical end-use service use in region :math:`n`, sector :math:`s` and period :math:`y`
-* :math:`\text{TE}_{n,s,y}`       :math:`\text{TE}_{n, s, y}\geq 0 ~ \forall n, s, y`         Value of total end-use service in the production function and utility function in region :math:`n`, sector :math:`s` and period :math:`y`
-* :math:`\text{E}_{n,s,y}`        :math:`\text{E}_{n, s, y}\geq 0 ~ \forall n, s, y`          Value of direct energy consumption of end-use service of households in the utility function in region :math:`n`, sector :math:`s` and period :math:`y`
-* :math:`\text{YE}_{n,s,y}`       :math:`\text{YE}_{n, s, y}\geq 0 ~ \forall n, s, y`         Value of end-use service energy consumption in the production function in region :math:`n`, sector :math:`s` and period :math:`y`
-* :math:`\text{EC}_{n,y}`         :math:`\text{EC} \in \left[-\infty..\infty\right]`          Approximation of system costs based on MESSAGE results
-* :math:`\text{UTILITY}`          :math:`\text{UTILITY} \in \left[-\infty..\infty\right]`     Utility function (discounted log of consumption)
-* =============================== =========================================================== ==============================================================================================================
-*
-***
-
-* ------------------------------------------------------------------------------
-* model variable declaration
-* ------------------------------------------------------------------------------
+* --- MCP Variablen und Gleichungen ---
 
 POSITIVE VARIABLES
-    K(node, year_all)                Capital stock in period year
-    Y(node, year_all)                Production in period year
-
-    PHYSENE(node, sector, year_all)  Physical end-use service or commodity use
-    YE(node, sector, year_all)       Value of end-use services or commodities in the production function
-    E(node, sector, year_all)        Value of end-use services or commodities in the utility function
-    TE(node, sector, year_all)       Total value of end-use services or commodities
-
-    C(node, year_all)                Consumption (Trillion $)
-    I(node, year_all)                Investment (Trillion $)
-
-    WAGE(node, year_all)             Effective wage rate 
-    KGROW(node, year_all)            Capital growth
+    KAP(node, year_all, quantile)     'Kapital pro Haushalt'
+    CON(node, year_all, quantile)     'Konsum pro Haushalt'
+    LAB(node, year_all, quantile)      'Labor pro Haushalt'
+    YE(node, sector, year_all)        'Neue Energie (POSITIVE damit YE**rho in PROD_FUNC definiert bleibt)'
+    K(node, year_all)                 'Aggregiertes Kapital'
+    C(node, year_all)                 'Aggregierter Konsum'
+    Y(node, year_all)                 'Produktion'
+    WAGE(node, year_all)              'Lohn'
+    INTEREST(node, year_all)          'Zins'
+    TE(node, sector, year_all)           'Gesamter Endnutzenergieinput'
+    E(node, sector, year_all)            'Direkter Energiebedarf Haushalt'
+    PHYSENE(node, sector, year_all)      'Physische Endnutzenergie'
+    GDP(node, year_all)
 ;
 
 VARIABLES
-    UTILITY                          Utility function (discounted log of consumption)
-    EC(node, year_all)               System costs (Trillion $) based on MESSAGE model run
+    HH_UTILITY_REP                        'Reporting only: sum of household utilities'
+    KGROW(node, year_all)                  'Kapitalwachstum'
+    EC(node, year_all)                   'Systemkosten'
+    I(node, year_all)                 'Aggregierte Investition'
 ;
 
-Variables
-* auxiliary variables for demand, prices, costs and GDP (for reporting when MESSAGE is run with MACRO)
-    GDP(node,year_all)               gross domestic product (GDP) in market exchange rates for MACRO reporting
+FREE VARIABLES
+    MU_KAP(node, year_all, quantile)  'Dual zu KAP_DYN (Kapitalakkumulation, alle Perioden)'
+    MU_TERMINAL_HH(node, year_all, quantile) 'Dual zu TERMINAL_HH_MCP (I_HH(T) = KAP(T)*(KGROW+depr))'
+    I_HH(node, year_all, quantile)    'Investition pro Haushalt (FREE, bestimmt durch INV_ACC oder TERMINAL)'
+* Keine Dualvariable für Märkte (Kapital, Arbeit): Märkte werden auf Preisvariablen gemappt, nicht auf Duals.
+
+* Entfernt: MU_PROD, MU_MPK, MU_MPL, MU_ENERGY_ACCOUNTING, MU_ENERGY_ACCOUNTING2, MU_ENERGY_SUPPLY, MU_AGG_CON, MU_AGG_INV, MU_CAP_USE, MU_HH_UTILITY_REP, MU_COST_ENERGY
+* Erklärung: Diese Duals sind nicht nötig, weil die zugehörigen Gleichungen reine Definitionen, Aggregationen oder Reporting-Gleichungen sind und keine Optimierungsbedingungen oder Märkte darstellen.
 ;
 
-* ------------------------------------------------------------------------------
-* model equations declaration
-* ------------------------------------------------------------------------------
+* --- MCP Gleichungen ---
 
 EQUATIONS
-    UTILITY_FUNCTION                      Utility function (discounted log of consumption summed over all projection periods)
-
-    CAPITAL_CONSTRAINT(node, year_all)    Capital constraint
-    CAPITAL(node, year_all)               Capital accumulation
-    INVESTMENT(node, year_all)            Investment accounting
-
-    PRODUCTION(node, year_all)            Production
-
-    ENERGY_ACCOUNTING(node, sector, year_all)  Energy accounting
-    ENERGY_ACCOUNTING2(node, sector, year_all) Energy accounting (household share)
-    ENERGY_SUPPLY(node, sector, *)             Supply of end-use services or commodities
-
-    COST_ENERGY(node, year_all)           System costs approximation based on MESSAGE input
-    TERMINAL_CONDITION(node, year_all)    Terminal condition
-
-    MARGINAL_PRODUCT_CAPITAL(node, year_all)  Marginal product of capital equals interest rate plus depreciation
-    MARGINAL_PRODUCT_LABOR(node, year_all)    Marginal product of labor equals wage rate
-    CAPITAL_GROWTH(node, year_all)            Capital growth rate definition
+    FOC_KAP_PROD(node, year_all)             'FOC Kapital (MPK)'
+    FOC_LAB_PROD(node, year_all)             'FOC Arbeit (MPL)'
+    KAP_DYN(node, year_all, quantile)     'Kapitaldynamik Haushalt (zusammengefuehrt, wie NLP EQ_KAP)'
+    AGG_KAP(node, year_all)               'Aggregiertes Kapital'
+    AGG_CON(node, year_all)               'Aggregierter Konsum'
+    AGG_INV(node, year_all)               'Aggregierte Investition'
+    CAP_USE(node, year_all)               'Aggregierte Kapitalverwendung (Y = C + I + EC)'
+    PROD_FUNC(node, year_all)                'Produktionsfunktion'
+    ENERGY_ACCOUNTING_MCP(node, sector, year_all)   'Energie-Bilanzgleichung (MCP)'
+    ENERGY_ACCOUNTING2_MCP(node, sector, year_all)  'Haushalts-Energiebedarf (MCP)'
+    ENERGY_SUPPLY_MCP(node, sector, year_all)       'Energieangebot (MCP)'
+    COST_ENERGY_MCP(node, year_all)                 'Systemkosten (MCP)'
+    HH_UTILITY_REP_DEF                                    'Definition der Haushaltsnutzenfunktion (repräsentativ)'
+    FOC_CON(node, year_all, quantile)              'FOC fuer Haushaltskonsum pro quantile'
+    FOC_KAP(node, year_all, quantile)              'FOC fuer Haushaltskapital (Euler, NOT last_period)'
+    FOC_KAP_LAST(node, year_all, quantile)         'FOC fuer Haushaltskapital im letzten Jahr (=G= paired KAP)'
+    MU_TERMINAL_DEF(node, year_all, quantile)      'Definition MU_TERMINAL_HH aus MU_KAP und KGROW+depr'
+    INV_ACC(node, year_all, quantile)              'Haushalts-Investitionsdefinition (NOT last_period)'
+    LABOR_MARKET(node, year_all)                   'Arbeitsmarktgleichgewicht'
+    TERMINAL_HH_MCP(node, year_all, quantile)      'Terminalbedingung: I_HH(T) = KAP(T)*(KGROW+depr)'
+    EQ_LAB(node, year_all, quantile)               'Haushaltsarbeitsangebot nach Quantil'
+    CAPITAL_GROWTH_MCP(node, year_all)             'Kapitalwachstum'
+    FOC_YE(node, sector, year_all)                 'FOC YE: Grenzprodukt = Grenzkosten'
 ;
 
-* ------------------------------------------------------------------------------
-* model equations definition
-* ------------------------------------------------------------------------------
+* Produktionsfunktion
+PROD_FUNC(node_active, year)$(NOT macro_base_period(year))..
+    Y(node_active, year) =E=
+        (ACONST(node_active) * K(node_active, year)**(rho(node_active) * kpvs(node_active))
+        * labor(node_active, year)**(rho(node_active) * (1 - kpvs(node_active)))
+        + SUM(sector, BCONST(node_active, sector) * YE(node_active, sector, year)**rho(node_active))
+        )**(1/rho(node_active));
 
-***
-* Equation UTILITY_FUNCTION
-* ---------------------------------
-* The utility function, which is maximized, sums the discounted logarithm of consumption :math:`\text{C}_{n,y}` and direct energy consumption 
-* of end-use services :math:`\text{E}_{n,s,y}` of a single representative household over the entire time horizon of the model.
+* Aggregierte Kapitalverwendung (Ressourcenbilanz)
+CAP_USE(node_active, year)$(NOT macro_base_period(year))..
+    Y(node_active, year) =E= C(node_active, year) + I(node_active, year) + EC(node_active, year);
+
+* --- ALTE VERSION (zweiteilig, auskommentiert als Backup) ---
+* I_HH(node, year_all, quantile) 'Investition pro Haushalt (FREE)' waere in VARIABLES zu deklarieren.
+* INV_ACC in EQUATIONS, INV_ACC.I_HH im MODEL-Block.
 *
-* The utility function and the capital formulation of the optimization problem are derived in previously (See equations 10 and 13 of the model documentation). 
+* KAP_DYN(node_active, year, quantile)$(NOT macro_base_period(year))..
+*     KAP(node_active, year, quantile) =E=
+*         SUM(year2$(seq_period(year2,year)),
+*             KAP(node_active, year2, quantile) * (1 - depr(node_active))**duration_period(year)
+*             + duration_period(year) * I_HH(node_active, year, quantile)
+*         );
 *
-* .. math:: \text{UTILITY} = \sum_{n} \bigg( &  \sum_{y |  (  (  {ord}( y )   >  1 )  \wedge  (  {ord}( y )   <   | y |  )  )} \text{udf}_{n, y} \cdot \bigg( (\beta_n + \sum_{s=1}^{3} \sigma_{s,n}) \log(\text{C}_{n, y}) - \sum_{s=1}^{3} \sigma_{s,n} \log(\text{p}_{n,s,y}) + \sum_{s=1}^{3} \sigma_{s,n} \log\left(\frac{\sigma_{s,n}}{\beta_n}\right) \bigg) \cdot \text{duration_period}_{y} \\
-*                                 + &\sum_{y |  (  {ord}( y ) =  | y | ) } \text{udf}_{n, y} \cdot \bigg( (\beta_n + \sum_{s=1}^{3} \sigma_{s,n}) \log(\text{C}_{n, y}) - \sum_{s=1}^{3} \sigma_{s,n} \log(\text{p}_{n,s,y}) + \sum_{s=1}^{3} \sigma_{s,n} \log\left(\frac{\sigma_{s,n}}{\beta_n}\right) \bigg) \cdot \big( \text{duration_period}_{y-1} + \frac{1}{\text{fin_time}_{n, y}} \big) \bigg)
+* INV_ACC(node_active, year, quantile)$(NOT macro_base_period(year))..
+*     I_HH(node_active, year, quantile) =E=
+*         SUM(year2$(seq_period(year2,year)),
+*             KAP(node_active, year2, quantile) * ((1 + INTEREST(node_active, year))**duration_period(year) - 1) / duration_period(year)
+*             + LAB(node_active, year, quantile) * WAGE(node_active, year)
+*             - eneprice(node_active, 'rc_spec', year)/1000 * quantile_share(quantile) * EMIN(node_active)
+*             - eneprice(node_active, 'rc_therm', year)/1000 * quantile_share(quantile) * EMIN(node_active)
+*             - eneprice(node_active, 'transport', year)/1000 * quantile_share(quantile) * EMIN(node_active)
+*             - ((alpha_q(node_active, quantile) + beta_rc_spec_q(node_active, quantile) + beta_rc_therm_q(node_active, quantile) + beta_transport_q(node_active, quantile))/alpha_q(node_active, quantile)) * CON(node_active, year, quantile)
+*         );
+* --- ENDE ALTE VERSION ---
+
+* =============================================================================
+* KAPITALDYNAMIK UND HAUSHALTSOPTIMIERUNG
+* =============================================================================
+* Struktur analog NLP: CAPITAL(t, alle t) + INVESTMENT(t, t!=T) + TERMINAL_CONDITION(T)
 *
+* Im MCP:
+*   KAP_DYN(t)      : KAP_t = KAP_{t-1}*(1-delta)^dt + dt*I_HH_t     [=E=, Dual: MU_KAP(t)]
+*   INV_ACC(t!=T)   : I_HH_t = Budget_t                               [=E=, Dual: keiner -> FREE pair]
+*   TERMINAL_HH(T)  : I_HH_T = KAP_T*(KGROW_T + depr)                [=E=, Dual: MU_TERMINAL_HH(T)]
 *
-***
-
-UTILITY_FUNCTION..
-UTILITY =E=
-SUM(node_active,
-    1000 * (SUM(year $ (NOT macro_base_period(year) AND NOT last_period(year)),
-            udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * LOG(C(node_active, year)) 
-            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
-            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
-            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * duration_period(year) )
-        + SUM(year $ last_period(year),
-            udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * LOG(C(node_active, year)) 
-            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
-            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
-            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * (duration_period(year) ) + 1/finite_time_corr(node_active, year)) )
-)
-;
-
-***
-* Equation CAPITAL_CONSTRAINT
-* ---------------------------------
-* The following equation specifies the allocation of total production among current consumption :math:`\text{C}_{n, y}`, investment into building up capital stock excluding
-* the sectors represented in MESSAGE :math:`\text{I}_{n, y}` and the MESSAGE system costs :math:`\text{EC}_{n, y}` which are derived from a previous MESSAGE model run. As described in :cite:`Manne-Richels-1992`, the first-order
-* optimality conditions lead to the Ramsey rule for the optimal allocation of savings, investment and consumption over time.
+* Daraus folgen die FOC:
+*   FOC_CON(t)       : dU/dCON - MU_KAP(t)*dt*ccf >= 0               [POSITIVE CON]
+*   FOC_KAP(t<T)     : MU_KAP(t) - MU_KAP(t+1)*G_{t+1} >= 0          [POSITIVE KAP]
+*   FOC_KAP_LAST(T)  : MU_KAP(T) - MU_TERMINAL_HH(T)*(KGROW+depr) >= 0 [POSITIVE KAP]
 *
-* .. math:: \text{Y}_{n, y} = \text{C}_{n, y} + \text{I}_{r, y} + \text{EC}_{n, y} \qquad \forall{n, y}
+* KAP_DYN(t) paired mit MU_KAP(t)        [FREE -> =E= always binding]
+* INV_ACC(t) paired mit I_HH(t)          [FREE -> =E= always binding]
+* TERMINAL_HH_MCP(T) paired mit MU_TERMINAL_HH(T) [FREE -> =E= always binding]
+
+* Kapitalakkumulation: KAP_t = KAP_{t-1}*(1-depr)^dt + dt*I_HH_t
+KAP_DYN(node_active, year, quantile)$(NOT macro_base_period(year))..
+    KAP(node_active, year, quantile) =E=
+        SUM(year2$(seq_period(year2,year)),
+            KAP(node_active, year2, quantile) * (1 - depr(node_active))**duration_period(year)
+            + duration_period(year) * I_HH(node_active, year, quantile)
+        );
+
+* Investitionsdefinition (Budget-Gleichung): nur fuer t != T
+* I_HH_t = Kapitalrendite + Arbeitseinkommen - Energiekosten - Konsumausgaben
+INV_ACC(node_active, year, quantile)$(NOT macro_base_period(year) AND NOT last_period(year))..
+    I_HH(node_active, year, quantile) =E=
+        SUM(year2$(seq_period(year2,year)),
+            KAP(node_active, year2, quantile) * ((1 + INTEREST(node_active, year))**duration_period(year) - 1) / duration_period(year)
+            + LAB(node_active, year, quantile) * WAGE(node_active, year)
+            - eneprice(node_active, 'rc_spec', year)/1000 * quantile_share(quantile) * EMIN(node_active)
+            - eneprice(node_active, 'rc_therm', year)/1000 * quantile_share(quantile) * EMIN(node_active)
+            - eneprice(node_active, 'transport', year)/1000 * quantile_share(quantile) * EMIN(node_active)
+            - ((alpha_q(node_active, quantile) + beta_rc_spec_q(node_active, quantile) + beta_rc_therm_q(node_active, quantile) + beta_transport_q(node_active, quantile))
+               / alpha_q(node_active, quantile)) * CON(node_active, year, quantile)
+        );
+
+* Terminalbedingung (analog NLP TERMINAL_CONDITION):
+* I_HH(T) = KAP(T) * (KGROW(T) + depr)  =>  genug Investition fuer Wachstum + Abschreibung
+TERMINAL_HH_MCP(node_active, year, quantile)$(last_period(year))..
+    I_HH(node_active, year, quantile) =E=
+        KAP(node_active, year, quantile) * (KGROW(node_active, year) + depr(node_active));
+
+
+* FOC Kapital (MPK = Zins)
+FOC_KAP_PROD(node_active, year)$(NOT macro_base_period(year))..
+    INTEREST(node_active, year) =E=
+        Y(node_active, year)**(1 - rho(node_active)) * LAKL(node_active) * kpvs(node_active)
+        * K(node_active, year)**(rho(node_active)*kpvs(node_active) - 1)
+        * labor(node_active, year)**(rho(node_active)*(1 - kpvs(node_active)));
+
+* FOC Arbeit (MPL = Lohn)
+FOC_LAB_PROD(node_active, year)$(NOT macro_base_period(year))..
+    WAGE(node_active, year) =E=
+        Y(node_active, year)**(1 - rho(node_active)) * LAKL(node_active) * (1 - kpvs(node_active))
+        * K(node_active, year)**(rho(node_active)*kpvs(node_active))
+        * labor(node_active, year)**(rho(node_active)*(1 - kpvs(node_active)) - 1);
+
+
+* FOC_YE: Grenzprodukt von YE = eneprice
+FOC_YE(node_active, sector, year)$(NOT macro_base_period(year) AND h(node_active, sector) < 1)..
+    eneprice(node_active, sector, year)/1000 =E=
+        Y(node_active, year)**(1 - rho(node_active))
+        * BCONST(node_active, sector) * YE(node_active, sector, year)**(rho(node_active) - 1);
+
+AGG_KAP(node_active, year)$(NOT macro_base_period(year))..
+    K(node_active, year) =E= SUM(quantile, KAP(node_active, year, quantile));
+
+AGG_CON(node_active, year)$(NOT macro_base_period(year))..
+    C(node_active, year) =E= SUM(quantile, CON(node_active, year, quantile));
+
+* AGG_INV: Aggregierte Investition = Summe der Haushalts-Investitionen.
+* I_HH wird durch INV_ACC (t!=T) und TERMINAL_HH_MCP (T) bestimmt.
+* CAP_USE.I bestimmt I residual aus Y-C-EC, und AGG_INV verbindet I mit SUM(I_HH).
+* Paarung: AGG_INV.I im MCP-Block (I ist FREE/VARIABLE)
+AGG_INV(node_active, year)$(NOT macro_base_period(year))..
+    I(node_active, year) =E= SUM(quantile, I_HH(node_active, year, quantile));
+
+
+* --- Energiegleichungen (MCP-Form) ---
+
+* Energie-Bilanzgleichung
+ENERGY_ACCOUNTING_MCP(node_active, sector, year)$(NOT macro_base_period(year))..
+    TE(node_active, sector, year) =E= YE(node_active, sector, year) + E(node_active, sector, year);
+
+* Haushalts-Energiebedarf (quantile-spezifisch, konsistent mit INV_ACC und FOC_CON)
+ENERGY_ACCOUNTING2_MCP(node_active, sector, year)$(NOT macro_base_period(year))..
+    E(node_active, sector, year) =E=
+        SUM(quantile,
+            quantile_share(quantile) * EMIN(node_active)
+            + (beta_rc_spec_q(node_active, quantile) / alpha_q(node_active, quantile))
+              * CON(node_active, year, quantile) / (eneprice(node_active, 'rc_spec', year)/1000)
+        ) $ sameas(sector, 'rc_spec')
+    + SUM(quantile,
+            quantile_share(quantile) * EMIN(node_active)
+            + (beta_rc_therm_q(node_active, quantile) / alpha_q(node_active, quantile))
+              * CON(node_active, year, quantile) / (eneprice(node_active, 'rc_therm', year)/1000)
+        ) $ sameas(sector, 'rc_therm')
+    + SUM(quantile,
+            quantile_share(quantile) * EMIN(node_active)
+            + (beta_transport_q(node_active, quantile) / alpha_q(node_active, quantile))
+              * CON(node_active, year, quantile) / (eneprice(node_active, 'transport', year)/1000)
+        ) $ sameas(sector, 'transport')
+    + 0 $ (sameas(sector, 'i_spec') OR sameas(sector, 'i_therm'));
+
+* Energieangebot: PHYSENE >= TE * aeei_factor (=G=, paired mit PHYSENE).
+* Im Optimum binding: PHYSENE = TE * aeei_factor.
+* Wenn slack: PHYSENE > TE*aeei -> PHYSENE auf LB (0), was TE*aeei <= 0 impliziert -> nur binding relevant.
+ENERGY_SUPPLY_MCP(node_active, sector, year)$(NOT macro_base_period(year))..
+    PHYSENE(node_active, sector, year) =G= TE(node_active, sector, year) * aeei_factor(node_active, sector, year);
+
+* Systemkosten
+COST_ENERGY_MCP(node_active, year)$(NOT macro_base_period(year))..
+    EC(node_active, year) =E=
+        (total_cost(node_active, year)/1000
+        + SUM(sector, eneprice(node_active, sector, year) * 1E-3 * (PHYSENE(node_active, sector, year) - enestart(node_active, sector, year)))
+        + SUM(sector, eneprice(node_active, sector, year) * 1E-3 / enestart(node_active, sector, year)
+            * (PHYSENE(node_active, sector, year) - enestart(node_active, sector, year)) * (PHYSENE(node_active, sector, year) - enestart(node_active, sector, year)))
+        );
+
+* Haushaltsnutzenfunktion (repräsentativ)
+HH_UTILITY_REP_DEF..
+    HH_UTILITY_REP =E=
+    SUM(node_active,
+        1000 * (
+            SUM((year, quantile)$(macro_horizon(year) AND NOT macro_base_period(year) AND NOT last_period(year)),
+                udf(node_active, year) * (
+                    LOG(CON(node_active, year, quantile))
+                    - beta_rc_spec_q(node_active, quantile) * LOG(eneprice(node_active, 'rc_spec', year) / 1000)
+                    + beta_rc_spec_q(node_active, quantile) * LOG(beta_rc_spec_q(node_active, quantile) / alpha_q(node_active, quantile))
+                    - beta_rc_therm_q(node_active, quantile) * LOG(eneprice(node_active, 'rc_therm', year) / 1000)
+                    + beta_rc_therm_q(node_active, quantile) * LOG(beta_rc_therm_q(node_active, quantile) / alpha_q(node_active, quantile))
+                    - beta_transport_q(node_active, quantile) * LOG(eneprice(node_active, 'transport', year) / 1000)
+                    + beta_transport_q(node_active, quantile) * LOG(beta_transport_q(node_active, quantile) / alpha_q(node_active, quantile))
+                ) * duration_period(year)
+            )
+            + SUM((year, quantile)$last_period(year),
+                udf(node_active, year) * (
+                    LOG(CON(node_active, year, quantile))
+                    - beta_rc_spec_q(node_active, quantile) * LOG(eneprice(node_active, 'rc_spec', year) / 1000)
+                    + beta_rc_spec_q(node_active, quantile) * LOG(beta_rc_spec_q(node_active, quantile) / alpha_q(node_active, quantile))
+                    - beta_rc_therm_q(node_active, quantile) * LOG(eneprice(node_active, 'rc_therm', year) / 1000)
+                    + beta_rc_therm_q(node_active, quantile) * LOG(beta_rc_therm_q(node_active, quantile) / alpha_q(node_active, quantile))
+                    - beta_transport_q(node_active, quantile) * LOG(eneprice(node_active, 'transport', year) / 1000)
+                    + beta_transport_q(node_active, quantile) * LOG(beta_transport_q(node_active, quantile) / alpha_q(node_active, quantile))
+                ) * duration_period(year)
+                + 1 / finite_time_corr(node_active, year)
+            )
+        )
+    ) ;
+
+* =============================================================================
+* FOC-BEDINGUNGEN (aus Lagrangian der Haushaltsoptimierung)
+* =============================================================================
 *
-***
-
-CAPITAL_CONSTRAINT(node_active, year)..
-Y(node_active, year) =E=
-C(node_active, year) + I(node_active, year) + EC(node_active, year)
-;
-
-***
-* Equation CAPITAL
-* ---------------------------------
+* Lagrangian:
+*   L = SUM_t [ 1000*udf_t*dt * LOG(CON_t) ]
+*     - SUM_t [ MU_KAP_t * (KAP_t - KAP_{t-1}*(1-d)^dt - dt*I_HH_t) ]    <- KAP_DYN
+*     - SUM_{t!=T} [ I_HH_t - Budget_t(KAP_{t-1}, r_t, w_t, L_t, CON_t) ] <- INV_ACC (implicit, I_HH FREE)
+*     - MU_TERM_T * (I_HH_T - KAP_T*(KGROW_T+d))                          <- TERMINAL
 *
-* The household maximizes its utility subject to the constraint on wealth accumulation of capital in the sectors not represented in the energy model MESSAGE.
-* The net capital (or wealth) formation :math:`\text{K}_{n,t}` is derived from the existing capital stock, returns on capital, labor income, minus the expenses
-* for direct energy consumption and all other consumption goods, as well as depreciation of the previous capital stock.
-*
-* .. math:: \text{K}_{t+1,n} = (1 - \delta_{n})^{\text{period}_{t}} \text{K}_{t,n} + ((1 + r_{t,n})^{\text{period}_{t}} - 1) \text{K}_{t,n} + \text{period}_{t} \left( w_{t,n} L_{t,n} - \sum_{s=1}^{3} p_{t,s,n} L_{n,t} E_{min,t,s,n} - \frac{\beta + \sum_{s=1}^{3} \sigma_{s,n}}{\beta} C_{t,n} \right) \qquad (15)
-*
-***
+* dL/dCON_t = 1000*udf_t*dt/CON_t - MU_KAP_t*dt*ccf_q >= 0, kompl. CON_t >= 0
+* dL/dKAP_t (t<T) = -MU_KAP_t + MU_KAP_{t+1}*G_{t+1} + [term from INV_ACC(t)] >= 0
+*   wobei KAP_{t-1} in INV_ACC(t) mit Koeff (r_t^dt-1)/dt, Dual INV_ACC.I_HH = MU_KAP_t*dt (aus KAP_DYN)
+*   -> Euler: MU_KAP_t = MU_KAP_{t+1} * G_{t+1}
+* dL/dKAP_T = -MU_KAP_T + MU_TERM_T*(KGROW_T+d) >= 0, kompl. KAP_T >= 0
 
-CAPITAL(node_active, year) $ (NOT macro_base_period(year))..
-K(node_active, year) =E=
-SUM(year2$( seq_period(year2,year) ), K(node_active, year2) * (1 - depr(node_active))**duration_period(year2) + K(node_active, year2) * ((1 + interestrate(year2))**duration_period(year2) - 1) 
-+ duration_period(year2) * labor(node_active, year2) * WAGE(node_active, year2) 
-- duration_period(year2) * eneprice(node_active, 'rc_spec', year2)/1000 * labor(node_active, year2) * EMIN(node_active)
-- duration_period(year2) * eneprice(node_active, 'rc_therm', year2)/1000 * labor(node_active, year2) * EMIN(node_active) 
-- duration_period(year2) * eneprice(node_active, 'transport', year2)/1000 * labor(node_active, year2) * EMIN(node_active) 
-- duration_period(year2) * (((alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active))/alpha(node_active))) * C(node_active, year2)
-) 
-;
+* FOC Konsum (alle t != base):
+* CON_t erscheint in KAP_DYN(t) via I_HH_t (durch INV_ACC), Koeff = -dt*ccf_q, Dual = MU_KAP_t
+FOC_CON(node_active, year, quantile)$(NOT macro_base_period(year))..
+    1000 * udf(node_active, year) * duration_period(year) / CON(node_active, year, quantile)
+    - MU_KAP(node_active, year, quantile)
+        * duration_period(year)
+        * (alpha_q(node_active, quantile) + beta_rc_spec_q(node_active, quantile) + beta_rc_therm_q(node_active, quantile) + beta_transport_q(node_active, quantile))
+        / alpha_q(node_active, quantile)
+    =G= 0 ;
 
-***
-* Equation INVESTMENT
-* ---------------------------------
-*
-*
-***
+* FOC Kapital (t != base, t < T):
+* KAP(t) erscheint in:
+*   - LHS KAP_DYN(t): Koeff +1, Dual MU_KAP(t)
+*   - KAP_{t-1} in INV_ACC(t+1): Koeff +(r_{t+1}^dt-1)/dt, mit Dual MU_KAP(t+1)*dt (indirekt)
+*   - KAP_{t-1} in KAP_DYN(t+1): Koeff +(1-d)^{dt+1}, mit Dual MU_KAP(t+1)
+* Zusammen: MU_KAP(t) = MU_KAP(t+1) * [(1-d)^dt + (1+r_{t+1})^dt - 1]
+FOC_KAP(node_active, year, quantile)$(NOT macro_base_period(year) AND NOT last_period(year))..
+    MU_KAP(node_active, year, quantile)
+    - SUM(year2$seq_period(year, year2),
+        MU_KAP(node_active, year2, quantile)
+            * ( (1 - depr(node_active)) ** duration_period(year2)
+                + (1 + INTEREST(node_active, year2)) ** duration_period(year2) - 1 )
+    )
+    =G= 0 ;
 
-INVESTMENT(node_active, year) $ (NOT macro_base_period(year))..
-SUM(year2$( seq_period(year2,year) ), I(node_active, year2)) =E=
-K(node_active, year) - SUM(year2$( seq_period(year2,year) ), K(node_active, year2) * (1 - depr(node_active))**duration_period(year2))
-;
+* FOC Kapital im letzten Jahr:
+* KAP(T) erscheint in KAP_DYN(T) [Dual MU_KAP(T)] und TERMINAL_HH_MCP(T) [Dual MU_TERMINAL_HH(T)].
+* Netto-FOC: MU_KAP(T) - MU_TERMINAL_HH(T)*(KGROW+depr) >= 0, kompl. KAP(T) >= 0
+FOC_KAP_LAST(node_active, year, quantile)$last_period(year)..
+    MU_KAP(node_active, year, quantile)
+    - MU_TERMINAL_HH(node_active, year, quantile)
+        * (KGROW(node_active, year) + depr(node_active))
+    =G= 0 ;
 
-***
-* Equation PRODUCTION
-* ---------------------------------
-*
-* We implement a nested constant elasticity of substitution (CES) production function with capital, labor, and the (commercial) end-use services 
-* represented in MESSAGE as inputs. :math:`\text{Y}_{n,t}` should correspond to gross domestic product (GDP).
-*
-* .. math:: \text{Y}_{n,t} = \left( a_{n} \cdot \text{K}_{n, t}^{ ( \rho_{n} \cdot \alpha_{n} ) } \cdot \text{L}_{n, t}^{ ( \rho_{n} \cdot ( 1 - \alpha_{n} ) ) } + \sum_{s} ( b_{n, s} \cdot \text{YE}_{n, s, t}^{\rho_{n}} ) \right)^{ \frac{1}{\rho_{n}} } \qquad \forall n, t > 1 \qquad (16)
-*
-***
+* MU_TERMINAL_HH definiert aus der Gleichgewichtsbedingung FOC_KAP_LAST (binding im Innern):
+* MU_TERMINAL_HH(T) = MU_KAP(T) / (KGROW(T) + depr)
+MU_TERMINAL_DEF(node_active, year, quantile)$last_period(year)..
+    MU_TERMINAL_HH(node_active, year, quantile) * (KGROW(node_active, year) + depr(node_active))
+    - MU_KAP(node_active, year, quantile)
+    =E= 0 ;
 
-PRODUCTION(node_active, year) $ (NOT macro_base_period(year))..
-Y(node_active, year) =E=
-pei(node_active, year) * (LAKL(node_active) * K(node_active, year)**(rho(node_active) * kpvs(node_active)) * labor(node_active, year)**(RHO(node_active) * (1 - kpvs(node_active)))
-+ PRFCONST(node_active, 'i_spec') * YE(node_active, 'i_spec', year)**rho(node_active)
-+ PRFCONST(node_active, 'i_therm') * YE(node_active, 'i_therm', year)**rho(node_active)
-+ (1-h(node_active, 'rc_spec')) * PRFCONST(node_active, 'rc_spec') * YE(node_active, 'rc_spec', year)**rho(node_active)
-+ (1-h(node_active, 'rc_therm')) * PRFCONST(node_active, 'rc_therm') * YE(node_active, 'rc_therm', year)**rho(node_active)
-+ (1-h(node_active, 'transport')) * PRFCONST(node_active, 'transport') * YE(node_active, 'transport', year)**rho(node_active)
-)**(1/rho(node_active))
-;
 
-***
-* Equation MARGINAL_PRODUCT_CAPITAL
-* ---------------------------------
-* First-order condition from profit maximization: The marginal product of capital equals the interest rate plus depreciation.
-* This is the classical arbitrage condition: MPK - depr = interestrate, or equivalently MPK = interestrate + depr
-* Derived from the CES production function Y = pei * [LAKL * K^(rho*alpha) * L^(rho*(1-alpha)) + sum_s b_s * YE_s^rho]^(1/rho)
-*
-* .. math:: \frac{\partial Y}{\partial K} = r + \delta
-*
-***
 
-MARGINAL_PRODUCT_CAPITAL(node_active, year) $ (NOT macro_base_period(year))..
-Y(node_active, year)**(1-rho(node_active)) * pei(node_active, year)**rho(node_active) 
-* LAKL(node_active) * kpvs(node_active) 
-* K(node_active, year)**(rho(node_active)*kpvs(node_active) - 1) 
-* labor(node_active, year)**(rho(node_active)*(1-kpvs(node_active)))
-=E=
-interestrate(year) + depr(node_active)
-;
+* Haushaltsarbeitsangebot nach Quantil
+EQ_LAB(node_active, year, quantile)..
+    LAB(node_active, year, quantile) =E= labor(node_active, year) * quantile_share(quantile);
 
-***
-* Equation MARGINAL_PRODUCT_LABOR
-* ---------------------------------
-* First-order condition: The marginal product of labor equals the wage rate.
-* Derived from the CES production function.
-*
-* .. math:: \frac{\partial Y}{\partial L} = Y^{1-\rho} \cdot \text{pei}^{\rho} \cdot \text{LAKL} \cdot (1-\alpha) \cdot K^{\rho\alpha} \cdot L^{\rho(1-\alpha) - 1}
-*
-***
+* Arbeitsmarktgleichgewicht: Summe Haushaltsarbeitsangebot = Aggregat
+LABOR_MARKET(node_active, year)$(NOT macro_base_period(year))..
+    labor(node_active, year) =E= SUM(quantile, LAB(node_active, year, quantile));
 
-MARGINAL_PRODUCT_LABOR(node_active, year) $ (NOT macro_base_period(year))..
-WAGE(node_active, year) =E=
-Y(node_active, year)**(1-rho(node_active)) * pei(node_active, year)**rho(node_active) 
-* LAKL(node_active) * (1-kpvs(node_active)) 
-* K(node_active, year)**(rho(node_active)*kpvs(node_active)) 
-* labor(node_active, year)**(rho(node_active)*(1-kpvs(node_active)) - 1)
-;
-
-***
-* Equation CAPITAL_GROWTH
-* ---------------------------------
-* Definition of the capital growth rate KGROW as the net growth rate of capital stock (backwards-looking).
-* This is used in the terminal condition to ensure sufficient investment for capital replacement and growth.
-* The growth rate is defined as: KGROW(t) = (K(t) - K(t-1)) / K(t-1)
-*
-* .. math:: \text{KGROW}_{n,t} = \frac{K_{n,t} - K_{n,t-1}}{K_{n,t-1}}
-*
-***
-
-CAPITAL_GROWTH(node_active, year) $ (NOT macro_base_period(year))..
-KGROW(node_active, year) =E=
-(K(node_active, year) - SUM(year2$( seq_period(year2, year) ), K(node_active, year2))) / SUM(year2$( seq_period(year2, year) ), K(node_active, year2))
-;
-
-***
-* Equations ENERGY ACCOUNTING
-* ---------------------------------
-* Energy accounting equations. See model documentation.
-*
-***
-
-ENERGY_ACCOUNTING(node_active, sector, year) $ (NOT macro_base_period(year))..
-TE(node_active, sector, year) =G=
-YE(node_active, sector, year) + E(node_active, sector, year)
-;
-
-ENERGY_ACCOUNTING2(node_active, sector, year) $ (NOT macro_base_period(year))..
-E(node_active, sector, year) =G=
-TE(node_active, sector, year) * h(node_active, sector)
-;
-
-$ontext
-TE_EQUATION(node_active, sector, year) $ (NOT macro_base_period(year))..
-TE(node_active, sector, year) =E=
-
-( (labor(node_active, year) * EMIN(node_active) 
- + (beta_rc_spec(node_active) / alpha(node_active)) * C(node_active, year) / (eneprice(node_active, 'rc_spec', year)/1000)
-) / h(node_active, 'rc_spec') ) $ (sameas(sector,'rc_spec') AND h(node_active, 'rc_spec') <> 0)
-
-+ ( (labor(node_active, year) * EMIN(node_active)
-   + (beta_rc_therm(node_active) / alpha(node_active)) * C(node_active, year) / (eneprice(node_active, 'rc_therm', year)/1000)
-) / h(node_active, 'rc_therm') ) $ (sameas(sector,'rc_therm') AND h(node_active, 'rc_therm') <> 0)
-
-+ ( (labor(node_active, year) * EMIN(node_active)
-   + (beta_transport(node_active) / alpha(node_active)) * C(node_active, year) / (eneprice(node_active, 'transport', year)/1000)
-) / h(node_active, 'transport') ) $ (sameas(sector,'transport') AND h(node_active, 'transport') <> 0)
-
-+ 0 $ (sameas(sector,'i_spec') OR sameas(sector,'i_therm'))
-;
-$offtext
-
-ENERGY_SUPPLY(node_active, sector, year) $ (NOT macro_base_period(year))..
-PHYSENE(node_active, sector, year) =G=
-TE(node_active, sector, year) * aeei_factor(node_active, sector, year)
-;
-
-COST_ENERGY(node_active, year) $ (NOT macro_base_period(year))..
-EC(node_active, year) =E=
-(total_cost(node_active, year)/1000
-+ SUM(sector, eneprice(node_active, sector, year) * 1E-3 * (PHYSENE(node_active, sector, year) - enestart(node_active, sector, year)))
-+ SUM(sector, eneprice(node_active, sector, year) * 1E-3 / enestart(node_active, sector, year) * (PHYSENE(node_active, sector, year) - enestart(node_active, sector, year)) * (PHYSENE(node_active, sector, year) - enestart(node_active, sector, year))))
-;
-
-***
-* Equation TERMINAL_CONDITION
-* ---------------------------------
-* Given the finite time horizon of MACRO, a terminal constraint needs to be applied to ensure that investments are chosen at an appropriate level, i.e. to replace depriciated capital and
-* provide net growth of capital stock beyond MACRO's time horizon :cite:`Manne-Richels-1992`. The goal is to avoid to the extend possible model artifacts resulting from this finite time horizon
-* cutoff.
-*
-* .. math:: \text{K}_{n, y} \cdot  \left( \text{grow}_{n, y} + \text{depr}_n \right) \leq \text{I}_{n, y} \qquad \forall{ n, y = \text{last year}}
-***
-
-TERMINAL_CONDITION(node_active, last_period)..
-I(node_active, last_period) =G= K(node_active, last_period) * (KGROW(node_active, last_period) + depr(node_active))
-;
-
-* ------------------------------------------------------------------------------
-* model definition
-* ------------------------------------------------------------------------------
+* Kapitalwachstum (KGROW)
+CAPITAL_GROWTH_MCP(node_active, year)$(NOT macro_base_period(year))..
+    KGROW(node_active, year) =E=
+        SUM(year2$(seq_period(year2, year)), (K(node_active, year) - K(node_active, year2)) / K(node_active, year2));
+    
+* --- MCP-EMP-Block (schematisch, anpassen nach Bedarf) ---
 
 MODEL MESSAGE_MACRO /
-    UTILITY_FUNCTION
-    CAPITAL_CONSTRAINT
-    CAPITAL
-    INVESTMENT
-    PRODUCTION
-    ENERGY_ACCOUNTING
-    ENERGY_ACCOUNTING2
-    ENERGY_SUPPLY
-    COST_ENERGY
-    TERMINAL_CONDITION
-    MARGINAL_PRODUCT_CAPITAL
-    MARGINAL_PRODUCT_LABOR
-    CAPITAL_GROWTH
+    PROD_FUNC.Y
+    CAP_USE.I
+*   AGG_INV.I  -- Walras: I = SUM(I_HH) folgt implizit aus Marktclearing + KAP_DYN; CAP_USE.I erzwingt Guetermarkt
+    FOC_KAP_PROD.INTEREST
+    FOC_LAB_PROD.WAGE
+    AGG_KAP.K
+    AGG_CON.C
+    ENERGY_ACCOUNTING_MCP.TE
+    ENERGY_ACCOUNTING2_MCP.E
+    ENERGY_SUPPLY_MCP.PHYSENE
+    COST_ENERGY_MCP.EC
+    EQ_LAB.LAB
+    TERMINAL_HH_MCP.I_HH
+    CAPITAL_GROWTH_MCP.KGROW
+    FOC_CON.CON
+    FOC_KAP.KAP
+    FOC_KAP_LAST.KAP
+    MU_TERMINAL_DEF.MU_TERMINAL_HH
+    KAP_DYN.MU_KAP
+    INV_ACC.I_HH
+    FOC_YE.YE
 / ;
+* Paarungslogik:
+*   PROD_FUNC.Y              : Produktionsfunktion -> Y
+*   FOC_KAP_PROD.INTEREST    : MPK = r
+*   FOC_LAB_PROD.WAGE        : MPL = w
+*   AGG_CON.C, AGG_INV.I, AGG_KAP.K : Aggregate aus Quantilsummen
+*   ENERGY_ACCOUNTING_MCP.TE : TE = YE + E -> TE (Identitaet, bestimmt TE gegeben YE,E)
+*   ENERGY_ACCOUNTING2_MCP.E : E = f(C,p) -> E
+*   ENERGY_SUPPLY_MCP.PHYSENE: PHYSENE >= TE*aeei -> PHYSENE (komplementaer zu PHYSENE >= 0)
+*   COST_ENERGY_MCP.EC       : EC = f(PHYSENE) -> EC
+*   FOC_YE.YE                : dY/dYE = dEC/dYE (via PHYSENE=TE*aeei) -> YE
+*   CAP_USE.I              : Gütermarktbilanz Y = C + I + EC -> I (residuale Investition, I erscheint in der Gleichung)
 
-MESSAGE_MACRO.optfile = 1;
+
+*MESSAGE_MACRO.optfile = 1;
+
+* Märkte werden auf Preisvariablen gemappt (WAGE, INTEREST), nicht auf Duals.
+* Terminalbedingungen werden als eigene Gleichungen mit Duals gemappt.
+
+* Entfernt aus dem MODEL-Block:
+* - FOC_KAP_PROD, FOC_LAB_PROD, ENERGY_ACCOUNTING_MCP, ENERGY_ACCOUNTING2_MCP, ENERGY_SUPPLY_MCP, COST_ENERGY_MCP, AGG_CON, AGG_INV, HH_UTILITY_REP_DEF
+* Erklärung: AGG_INV (I = sum I_HH_q) ist nicht im MCP-Block, weil I residual durch CAP_USE bestimmt wird.
+* Die Konsistenz sum(I_HH_q) = I ist eine Gleichgewichtseigenschaft, die im korrekten Gleichgewicht gilt.
