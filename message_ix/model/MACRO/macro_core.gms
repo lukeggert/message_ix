@@ -99,7 +99,6 @@ POSITIVE VARIABLES
     TE(node, sector, year_all)       Total value of end-use services or commodities
 
     C(node, year_all)                Consumption (Trillion $)
-    I(node, year_all)                Investment (Trillion $)
 
     WAGE(node, year_all)             Effective wage rate 
 
@@ -121,6 +120,7 @@ VARIABLES
     EC(node, year_all)               System costs (Trillion $) based on MESSAGE model run
     EC_REG(node, year_all)
     KGROW(node, year_all)            Capital growth
+    I(node, year_all)                Investment (Trillion $)
 ;
 
 Variables
@@ -188,24 +188,6 @@ EQUATIONS
 *
 *
 ***
-
-$ontext
-UTILITY_FUNCTION..
-UTILITY =E=
-SUM(node_active,
-    1000 * (SUM(year $ (NOT macro_base_period(year) AND NOT last_period(year)),
-            udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * SUM(quantile, LOG(CON(node_active, year, quantile))) 
-            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year) * aeei_factor(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
-            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year) * aeei_factor(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
-            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year) * aeei_factor(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * duration_period(year) )
-        + SUM(year $ last_period(year),
-            udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * SUM(quantile, LOG(CON(node_active, year, quantile))) 
-            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year) * aeei_factor(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
-            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year) * aeei_factor(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
-            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year) * aeei_factor(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * (duration_period(year) ) + 1/finite_time_corr(node_active, year)) )
-)
-;
-$offtext
 
 UTILITY_FUNCTION..
 UTILITY =E=
@@ -284,20 +266,6 @@ Y(node_active, year) =E=
     + SUM(sector, BCONST(node_active, sector) * YE(node_active, sector, year)**rho(node_active))
     )**(1/rho(node_active))
 ;
-
-$ontext
-TECHNOLOGY(node_active, year) $ (NOT macro_base_period(year))..
-AE(node_active, year) =E=
-(gdp_calibrate(node_active, year)/ 1000)
-/ ( (LAKL(node_active) * K(node_active, year)**(rho(node_active) * kpvs(node_active)) * labor(node_active, year)**(rho(node_active) * (1 - kpvs(node_active)))
-+ PRFCONST(node_active, 'i_spec') * YE(node_active, 'i_spec', year)**rho(node_active)
-+ PRFCONST(node_active, 'i_therm') * YE(node_active, 'i_therm', year)**rho(node_active)
-+ PRFCONST(node_active, 'rc_spec') * YE(node_active, 'rc_spec', year)**rho(node_active)
-+ PRFCONST(node_active, 'rc_therm') * YE(node_active, 'rc_therm', year)**rho(node_active)
-+ PRFCONST(node_active, 'transport') * YE(node_active, 'transport', year)**rho(node_active)
-)**(1/rho(node_active)) )
-;
-$offtext
 
 MARGINAL_PRODUCT_CAPITAL(node_active, year) $ (NOT macro_base_period(year))..
 INTEREST(node_active, year) =E= 

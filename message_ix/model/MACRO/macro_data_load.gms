@@ -257,10 +257,10 @@ DISPLAY enestart, eneprice, total_cost;
 *e_q_min(node_macro, 'i_spec', year)$(NOT macro_base_period(year)) = 0 ;
 *e_q_min(node_macro, 'i_therm', year)$(NOT macro_base_period(year)) = 0 ;
 
-e_min(node_macro, 'rc_spec') = 0.0456 ; 
+e_min(node_macro, 'rc_spec') = 0.045 ; 
 * 0.005 für rc_aspec läuft gut, aber zu niedriges E
-e_min(node_macro, 'rc_therm') = 0.12 ; 
-e_min(node_macro, 'transport') = 0.156 ; 
+e_min(node_macro, 'rc_therm') = 0.12; 
+e_min(node_macro, 'transport') = 0.196 ; 
 e_min(node_macro, 'i_spec') = 0 ; 
 e_min(node_macro, 'i_therm') = 0 ; 
 
