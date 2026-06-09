@@ -129,6 +129,7 @@ PARAMETERS
          beta_rc_spec_q(node, quantile)    'Quantile-specific residential specific electricity energy share'
          beta_rc_therm_q(node, quantile)   'Quantile-specific residential thermal energy share'
          beta_transport_q(node, quantile)  'Quantile-specific transport energy share'
+         e_min(node, sector)
 
          aconst(node)                       'Production function coefficient of capital-labor nest (calibrated)'
          bconst(node, sector)               'Production function coefficient of energy sectors (calibrated)'
@@ -175,7 +176,8 @@ $LOAD aeei,grow
 $LOAD gdp_calibrate,historical_gdp
 $LOAD demand_MESSAGE,cost_MESSAGE
 $LOAD price_MESSAGE
-$LOAD EMIN,drate
+*$LOAD drate
+*$LOAD EMIN
 *$LOAD alpha,beta_rc_spec,beta_rc_therm,beta_transport
 *$LOAD h
 
@@ -194,7 +196,7 @@ $GDXIN '/home/lukas/environments/macro_uba/lib/python3.10/site-packages/message_
 *$LOAD labor
 $LOAD alpha,beta_rc_spec,beta_rc_therm,beta_transport
 $LOAD h
-*$LOAD EMIN,drate
+$LOAD EMIN,drate
 *$LOAD price_MESSAGE
 $GDXIN
 
@@ -255,6 +257,13 @@ DISPLAY enestart, eneprice, total_cost;
 *e_q_min(node_macro, 'i_spec', year)$(NOT macro_base_period(year)) = 0 ;
 *e_q_min(node_macro, 'i_therm', year)$(NOT macro_base_period(year)) = 0 ;
 
+e_min(node_macro, 'rc_spec') = 0.0456 ; 
+* 0.005 für rc_aspec läuft gut, aber zu niedriges E
+e_min(node_macro, 'rc_therm') = 0.12 ; 
+e_min(node_macro, 'transport') = 0.156 ; 
+e_min(node_macro, 'i_spec') = 0 ; 
+e_min(node_macro, 'i_therm') = 0 ; 
+
 *DISPLAY e_q_min ;
 
 * ------------------------------------------------------------------------------
@@ -264,46 +273,37 @@ DISPLAY enestart, eneprice, total_cost;
 * By construction the shares sum to exactly 1 (telescoping sum).
 * ------------------------------------------------------------------------------
 
+$ontext
 quantile_share(quantile) =
     ( 1 - (ORD(quantile)-1) / CARD(quantile) ) ** ( (pareto_alpha-1) / pareto_alpha )
     - ( 1 - ORD(quantile)   / CARD(quantile) ) ** ( (pareto_alpha-1) / pareto_alpha ) ;
+$offtext
+
+* ------------------------------------------------------------------------------
+* Data-based quantile shares (manual input).
+* Bitte die 5 Werte unten mit den empirischen Einkommensanteilen (Quintile)
+* ersetzen. Die Summe muss 1 ergeben.
+* ------------------------------------------------------------------------------
+
+quantile_share(quantile) = 0 ;
+
+* Beispielwerte (ersetzen):
+quantile_share('D1') = 0.03254 ;
+quantile_share('D2') = 0.08276 ;
+quantile_share('D3') = 0.14301 ;
+quantile_share('D4') = 0.23368 ;
+quantile_share('D5') = 0.50801 ;
+
+*expenditure_share('D1') = 0.24 ;
+*expenditure_share('D2') = 0.24 ;
+*expenditure_share('D3') = 0.24 ; -> 31,6 %
+*expenditure_share('D4') = 0.22 ; -> 28,2 % pE/C
+*expenditure_share('D5') = 0.2 ; -> 25 %
+
+abort$(abs(sum(quantile, quantile_share(quantile)) - 1) > 1e-6)
+    'quantile_share muss ueber alle Quintile auf 1 normiert sein.' ;
 
 DISPLAY pareto_alpha, quantile_share ;
-
-* ------------------------------------------------------------------------------
-* Compute quantile-specific preference parameters (alpha_q, beta_*_q)
-* Energy expenditure share is empirically regressive: lower income deciles
-* spend a larger fraction of consumption on direct energy (Engel's law).
-* We use a power-law gradient (11 - decile_rank)^gamma_decile, normalized so
-* the arithmetic mean across deciles equals the aggregate parameter value.
-* This ensures the aggregate calibration is exactly preserved.
-*
-* D1 = poorest (rank 1, highest energy share)
-* D10 = richest (rank 10, lowest energy share)
-*
-* gamma_decile = 0: uniform (all deciles get aggregate value)
-* gamma_decile = 0.6: moderate gradient (default, D1 ~1.5x, D10 ~0.4x aggregate)
-* gamma_decile = 1.0: steep gradient (D1 ~2.3x, D10 ~0.3x aggregate)
-* ------------------------------------------------------------------------------
-
-SCALAR decile_wt_sum 'Sum of unnormalized decile weights for normalization' ;
-
-decile_energy_wt(quantile) = (6 - ORD(quantile)) ** gamma_decile ;
-decile_wt_sum = SUM(quantile, decile_energy_wt(quantile)) ;
-
-beta_total_agg(node_macro) = beta_rc_spec(node_macro) + beta_rc_therm(node_macro) + beta_transport(node_macro) ;
-
-* Quantile-specific sector betas: scaled so arithmetic mean = aggregate value
-beta_rc_spec_q(node_macro, quantile)   = beta_rc_spec(node_macro)   * CARD(quantile) * decile_energy_wt(quantile) / decile_wt_sum ;
-beta_rc_therm_q(node_macro, quantile)  = beta_rc_therm(node_macro)  * CARD(quantile) * decile_energy_wt(quantile) / decile_wt_sum ;
-beta_transport_q(node_macro, quantile) = beta_transport(node_macro) * CARD(quantile) * decile_energy_wt(quantile) / decile_wt_sum ;
-
-* alpha_q: residual, ensures alpha_q + sum_s(beta_s_q) = 1 for each decile
-alpha_q(node_macro, quantile) = 1 - beta_rc_spec_q(node_macro, quantile)
-                                  - beta_rc_therm_q(node_macro, quantile)
-                                  - beta_transport_q(node_macro, quantile) ;
-
-DISPLAY gamma_decile, decile_energy_wt, alpha, alpha_q, beta_rc_spec_q, beta_rc_therm_q, beta_transport_q ;
 
 * ------------------------------------------------------------------------------
 * calculate start values
@@ -353,8 +353,8 @@ LOOP(year_all $( ORD(year_all) > sum(year_all2$( macro_initial_period(year_all2)
 * new labor supply
     newlab(node_macro, year_all) = SUM(year_all2$( seq_period(year_all2,year_all) ), (labor(node_macro, year_all) - labor(node_macro, year_all2)*(depr(node_macro))**duration_period(year_all))$((labor(node_macro, year_all) - labor(node_macro, year_all2)*(1 - depr(node_macro))**duration_period(year_all)) > 0)) + epsilon ;
 * calculation of utility discount factor based on discount rate (drate)
-*    udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - (drate(node_macro) - grow(node_macro, year_all)))**duration_period(year_all)) ;
-    udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - drate(node_macro))**duration_period(year_all)) ;
+    udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - (drate(node_macro) - grow(node_macro, year_all)))**duration_period(year_all)) ;
+*    udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - drate(node_macro))**duration_period(year_all)) ;
 );
 
 DISPLAY labor, newlab, udf;
@@ -409,5 +409,5 @@ DISPLAY ecst0, k0, i0, c0, y0, prfconst, lakl, bconst, aconst, h ;
 * simply taken.
 * ------------------------------------------------------------------------------
 
-*finite_time_corr(node_macro, year) = abs(drate(node_macro) - grow(node_macro, year)) ;
-finite_time_corr(node_macro, year) = abs(drate(node_macro)) ;
+finite_time_corr(node_macro, year) = abs(drate(node_macro) - grow(node_macro, year)) ;
+*finite_time_corr(node_macro, year) = abs(drate(node_macro)) ;

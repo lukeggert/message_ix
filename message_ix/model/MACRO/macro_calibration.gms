@@ -115,14 +115,14 @@ LOOP(year_all $( ORD(year_all) > sum(year_all2$( macro_initial_period(year_all2)
        $((labor(node_macro, year_all) - labor(node_macro, year_all2) * (1 - depr(node_macro))**duration_period(year_all)) > 0)
    ) + epsilon ;
 * calculation of utility discount factor based on discount rate (drate)
-*   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - (drate(node_macro) - grow(node_macro, year_all)))**duration_period(year_all)) ;
-   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - drate(node_macro))**duration_period(year_all)) ;
+   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - (drate(node_macro) - grow(node_macro, year_all)))**duration_period(year_all)) ;
+*   udf(node_macro, year_all)    = SUM(year_all2$( seq_period(year_all2,year_all) ), udf(node_macro, year_all2) * (1 - drate(node_macro))**duration_period(year_all)) ;
 );
 DISPLAY labor, udf ;
 
 * recalcualte finite time horizon correction of utility function
-*finite_time_corr(node_macro, year) = abs(drate(node_macro) - grow(node_macro, year)) ;
-finite_time_corr(node_macro, year) = abs(drate(node_macro)) ;
+finite_time_corr(node_macro, year) = abs(drate(node_macro) - grow(node_macro, year)) ;
+*finite_time_corr(node_macro, year) = abs(drate(node_macro)) ;
 
 ) ;
 

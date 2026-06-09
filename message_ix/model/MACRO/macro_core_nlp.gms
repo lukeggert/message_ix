@@ -108,6 +108,7 @@ POSITIVE VARIABLES
     lab(node, year_all, quantile)
     con(node, year_all, quantile)
     kap(node, year_all, quantile)
+    e_hh(node, sector, year_all, quantile)
 *E_Q(node, sector, year_all, quantile)
 
 *K_test(node, year_all)
@@ -146,6 +147,8 @@ EQUATIONS
     ENERGY_ACCOUNTING2(node, sector, year_all) Household direct energy demand from household optimum
     ENERGY_SUPPLY(node, sector, *)             Supply of end-use services or commodities
 *NEW_ENERGY(node, sector, year_all)
+    ENERGY_HOUSEHOLD(node, sector, year_all, quantile)
+    ENERGY_SUM(node, sector, year_all)
 
     COST_ENERGY(node, year_all)           System costs approximation based on MESSAGE input
     COST_ENERGY_REG(node, year_all)       Regularization costs for new end-use energy expansion
@@ -192,14 +195,14 @@ UTILITY =E=
 SUM(node_active,
     1000 * (SUM(year $ (NOT macro_base_period(year) AND NOT last_period(year)),
             udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * SUM(quantile, LOG(CON(node_active, year, quantile))) 
-            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
-            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
-            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * duration_period(year) )
+            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year) * aeei_factor(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
+            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year) * aeei_factor(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
+            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year) * aeei_factor(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * duration_period(year) )
         + SUM(year $ last_period(year),
             udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * SUM(quantile, LOG(CON(node_active, year, quantile))) 
-            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
-            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
-            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * (duration_period(year) ) + 1/finite_time_corr(node_active, year)) )
+            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year) * aeei_factor(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
+            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year) * aeei_factor(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
+            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year) * aeei_factor(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * (duration_period(year) ) + 1/finite_time_corr(node_active, year)) )
 )
 ;
 $offtext
@@ -209,14 +212,14 @@ UTILITY =E=
 SUM(node_active,
     1000 * (SUM(year $ (NOT macro_base_period(year) AND NOT last_period(year)),
             udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * LOG(C(node_active, year)) 
-            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
-            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
-            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * duration_period(year) )
+            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year) /1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
+            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year) /1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
+            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year) /1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * duration_period(year) )
         + SUM(year $ last_period(year),
             udf(node_active, year) * ( (alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active)) * LOG(C(node_active, year)) 
-            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year)/1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
-            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year)/1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
-            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year)/1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * (duration_period(year) ) + 1/finite_time_corr(node_active, year)) )
+            - beta_rc_spec(node_active) * LOG(eneprice(node_active, 'rc_spec', year) /1000) + beta_rc_spec(node_active) * LOG(beta_rc_spec(node_active)/alpha(node_active)) 
+            - beta_rc_therm(node_active) * LOG(eneprice(node_active, 'rc_therm', year) /1000) + beta_rc_therm(node_active) * LOG(beta_rc_therm(node_active)/alpha(node_active))
+            - beta_transport(node_active) * LOG(eneprice(node_active, 'transport', year) /1000) + beta_transport(node_active) * LOG(beta_transport(node_active)/alpha(node_active)) ) * (duration_period(year) ) + 1/finite_time_corr(node_active, year)) )
 )
 ;
 
@@ -258,9 +261,9 @@ I(node_active, year) =E=
     SUM(year2$( seq_period(year2,year) ),
     (K(node_active, year2) * ((1 + INTEREST(node_active, year))**duration_period(year) - 1) / duration_period(year))
     + labor(node_active, year) * WAGE(node_active, year) 
-    - eneprice(node_active, 'rc_spec', year)/1000 * EMIN(node_active)
-    - eneprice(node_active, 'rc_therm', year)/1000 * EMIN(node_active) 
-    - eneprice(node_active, 'transport', year)/1000 * EMIN(node_active) 
+    - eneprice(node_active, 'rc_spec', year) /1000 * e_min(node_active, 'rc_spec')
+    - eneprice(node_active, 'rc_therm', year) /1000 * e_min(node_active, 'rc_therm')
+    - eneprice(node_active, 'transport', year) /1000 * e_min(node_active, 'transport')
     - ((alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active))/alpha(node_active)) * C(node_active, year))
 ;
 
@@ -340,19 +343,41 @@ YE(node_active, sector, year) + E(node_active, sector, year)
 
 ENERGY_ACCOUNTING2(node_active, sector, year) $ (NOT macro_base_period(year))..
 E(node_active, sector, year) =E=
-        ( EMIN(node_active)
-        + (beta_rc_spec(node_active) / alpha(node_active)) * C(node_active, year) / (eneprice(node_active, 'rc_spec', year)/1000)
+        ( e_min(node_active, 'rc_spec')
+        + (beta_rc_spec(node_active) / alpha(node_active)) * C(node_active, year) / (eneprice(node_active, 'rc_spec', year) /1000)
         ) $ sameas(sector, 'rc_spec')
 
-    + ( EMIN(node_active)
-        + (beta_rc_therm(node_active) / alpha(node_active)) * C(node_active, year) / (eneprice(node_active, 'rc_therm', year)/1000)
+    + ( e_min(node_active, 'rc_therm')
+        + (beta_rc_therm(node_active) / alpha(node_active)) * C(node_active, year) / (eneprice(node_active, 'rc_therm', year) /1000)
         ) $ sameas(sector, 'rc_therm')
 
-    + ( EMIN(node_active)
-        + (beta_transport(node_active) / alpha(node_active)) * C(node_active, year) / (eneprice(node_active, 'transport', year)/1000)
+    + ( e_min(node_active, 'transport')
+        + (beta_transport(node_active) / alpha(node_active)) * C(node_active, year) / (eneprice(node_active, 'transport', year) /1000)
         ) $ sameas(sector, 'transport')
 
     + 0 $ (sameas(sector, 'i_spec') OR sameas(sector, 'i_therm'))
+;
+
+ENERGY_HOUSEHOLD(node_active, sector, year, quantile) $ (NOT macro_base_period(year))..
+E_HH(node_active, sector, year, quantile) =E=
+        ( 0.2 * e_min(node_active, 'rc_spec')
+        + (beta_rc_spec(node_active) / alpha(node_active)) * CON(node_active, year, quantile) / (eneprice(node_active, 'rc_spec', year) /1000)
+        ) $ sameas(sector, 'rc_spec')
+
+    + ( 0.2 * e_min(node_active, 'rc_therm')
+        + (beta_rc_therm(node_active) / alpha(node_active)) * CON(node_active, year, quantile) / (eneprice(node_active, 'rc_therm', year) /1000)
+        ) $ sameas(sector, 'rc_therm')
+
+    + ( 0.2 * e_min(node_active, 'transport')
+        + (beta_transport(node_active) / alpha(node_active)) * CON(node_active, year, quantile) / (eneprice(node_active, 'transport', year) /1000)
+        ) $ sameas(sector, 'transport')
+
+    + 0 $ (sameas(sector, 'i_spec') OR sameas(sector, 'i_therm'))
+;
+
+* Aggregate energy
+ENERGY_SUM(node_active, sector, year) $ (NOT macro_base_period(year))..
+E(node_active, sector, year) =E= SUM(quantile, E_HH(node_active, sector, year, quantile))
 ;
 
 *NEW_ENERGY(node_active, sector, year) $ (NOT macro_base_period(year))..
@@ -427,13 +452,6 @@ EQ_LAB(node_active, year, quantile)..
 LAB(node_active, year, quantile) =E= labor(node_active, year) * quantile_share(quantile)
 ;
 
-
-*EQ_CON(node_active, year, quantile) $ (NOT macro_base_period(year))..
-*CON(node_active, year, quantile) =E=
-*    SUM(year2$( seq_period(year2,year) ),
-*        CON(node_active, year2, quantile) * udf(node_active, year) * (1 - depr(node_active) + INTEREST(node_active, year)))
-*;
-
 EQ_KAP(node_active, year, quantile) $ (NOT macro_base_period(year))..
 KAP(node_active, year, quantile) =E=
     SUM(year2$( seq_period(year2,year) ),
@@ -441,10 +459,10 @@ KAP(node_active, year, quantile) =E=
         duration_period(year) * (
             (KAP(node_active, year2, quantile) * ((1 + INTEREST(node_active, year))**duration_period(year) - 1) / duration_period(year))
             + LAB(node_active, year, quantile) * WAGE(node_active, year) 
-            - eneprice(node_active, 'rc_spec', year)/1000 * quantile_share(quantile) * EMIN(node_active)
-            - eneprice(node_active, 'rc_therm', year)/1000 * quantile_share(quantile) * EMIN(node_active) 
-            - eneprice(node_active, 'transport', year)/1000 * quantile_share(quantile) * EMIN(node_active) 
-            - ((alpha_q(node_active) + beta_rc_spec_q(node_active) + beta_rc_therm_q(node_active) + beta_transport_q(node_active))/alpha_q(node_active)) * CON(node_active, year, quantile)
+            - eneprice(node_active, 'rc_spec', year) /1000 * quantile_share(quantile) * e_min(node_active, 'rc_spec')
+            - eneprice(node_active, 'rc_therm', year) /1000 * quantile_share(quantile) * e_min(node_active, 'rc_therm') 
+            - eneprice(node_active, 'transport', year) /1000 * quantile_share(quantile) * e_min(node_active, 'transport') 
+            - ((alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active))/alpha(node_active)) * CON(node_active, year, quantile)
             ))
 ;
 
@@ -498,10 +516,10 @@ I_HH(node_active, year, quantile) =E=
     SUM(year2$( seq_period(year2,year) ),
         (KAP(node_active, year2, quantile) * ((1 + INTEREST(node_active, year))**duration_period(year) - 1) / duration_period(year))
         + LAB(node_active, year, quantile) * WAGE(node_active, year)
-        - eneprice(node_active, 'rc_spec', year)/1000 * quantile_share(quantile) * EMIN(node_active)
-        - eneprice(node_active, 'rc_therm', year)/1000 * quantile_share(quantile) * EMIN(node_active)
-        - eneprice(node_active, 'transport', year)/1000 * quantile_share(quantile) * EMIN(node_active)
-        - ((alpha_q(node_active) + beta_rc_spec_q(node_active) + beta_rc_therm_q(node_active) + beta_transport_q(node_active))/alpha_q(node_active)) * CON(node_active, year, quantile)
+        - eneprice(node_active, 'rc_spec', year) /1000 * quantile_share(quantile) * EMIN(node_active)
+        - eneprice(node_active, 'rc_therm', year) /1000 * quantile_share(quantile) * EMIN(node_active)
+        - eneprice(node_active, 'transport', year) /1000 * quantile_share(quantile) * EMIN(node_active)
+        - ((alpha(node_active) + beta_rc_spec(node_active) + beta_rc_therm(node_active) + beta_transport(node_active))/alpha(node_active)) * CON(node_active, year, quantile)
     )
 ;
 $offtext
@@ -520,6 +538,8 @@ MODEL MESSAGE_MACRO /
 *TE_EQUATION
     ENERGY_ACCOUNTING
     ENERGY_ACCOUNTING2
+    ENERGY_HOUSEHOLD
+    ENERGY_SUM
     ENERGY_SUPPLY
     COST_ENERGY
     COST_ENERGY_REG
